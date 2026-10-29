@@ -1,0 +1,19 @@
+AGENT.STUDIO PRECISION ARCHITECTURE AND POLICIES 2026
+
+1. Unified LLM Gateway:
+AGENT.STUDIO supports four primary providers: Google Gemini, GroqCloud, OpenRouter, and Mistral AI.
+Each provider is accessed through isolated backend adapters implementing standardized interfaces for chat completion, token streaming, and usage tracking.
+
+2. Document RAG Pipeline:
+The Retrieval-Augmented Generation pipeline extracts text from PDF, DOCX, and TXT files.
+Documents are divided into overlapping chunks of 600 characters with 120-character semantic overlap.
+Chunks are embedded into a 384-dimensional dense vector space and stored with metadata including document filename and page numbers.
+During conversation turns, cosine vector search retrieves the top relevant passages to ground the agent's response.
+
+3. Publishing and Versioning:
+Agents transition through four distinct states: Draft -> Tested -> Published -> Unpublished.
+Editing a published agent automatically spins off a new draft version, ensuring the live deployed agent remains uninterrupted until the creator explicitly republishes.
+
+4. Credential Security:
+All provider API keys are stored encrypted at rest using AES-256-GCM authenticated encryption with a dedicated master key.
+Client bundles and API responses never expose raw API keys.

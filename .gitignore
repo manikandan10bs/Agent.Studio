@@ -1,0 +1,51 @@
+# Environment variables & Secrets (CRITICAL: NEVER COMMIT)
+.env
+.env.*
+!.env.example
+*.env
+
+# SQLite Databases & Local Storage
+*.db
+*.sqlite
+*.sqlite3
+backend/*.db
+
+# User Uploaded Documents
+uploads/*
+!uploads/.gitkeep
+backend/uploads/*
+!backend/uploads/.gitkeep
+
+# Python Virtual Environments
+venv/
+.venv/
+env/
+ENV/
+*.egg-info/
+
+# Node Dependencies
+node_modules/
+frontend/node_modules/
+
+# Frontend Dist & Cache
+frontend/dist/
+frontend/.vite/
+.npm/
+
+# Python Cache & Bytecode
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.pytest_cache/
+.coverage
+htmlcov/
+.mypy_cache/
+
+# IDE & Editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db

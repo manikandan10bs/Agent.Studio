@@ -1,0 +1,15 @@
+services:
+  - type: web
+    name: agent-studio
+    env: docker
+    dockerfilePath: Dockerfile
+    plan: free
+    region: oregon
+    healthCheckPath: /api/health
+    envVars:
+      - key: DATABASE_URL
+        value: sqlite:///./agent_studio.db
+      - key: SECRET_KEY
+        generateValue: true
+      - key: ENCRYPTION_MASTER_KEY
+        generateValue: true
