@@ -30,10 +30,18 @@ app = FastAPI(
     lifespan=lifespan
 )
 
-# CORS configuration
+# Assemble CORS origins
+cors_origins = list(settings.BACKEND_CORS_ORIGINS)
+if settings.FRONTEND_URL and settings.FRONTEND_URL.strip():
+    clean_fe = settings.FRONTEND_URL.strip().rstrip("/")
+    if clean_fe not in cors_origins:
+        cors_origins.append(clean_fe)
+
+# CORS configuration supporting localhost, custom domains, and Vercel preview/production deployments
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=settings.BACKEND_CORS_ORIGINS,
+    allow_origins=cors_origins,
+    allow_origin_regex=r"https://.*\.vercel\.app",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

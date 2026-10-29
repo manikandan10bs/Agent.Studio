@@ -16,6 +16,14 @@ class Settings(BaseSettings):
     # Upload storage directory
     STORAGE_DIR: str = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "uploads")
     
+    # Optional Production Frontend Domain
+    FRONTEND_URL: Optional[str] = None
+
+    # Supabase (Optional persistent document storage & PostgreSQL)
+    SUPABASE_URL: Optional[str] = None
+    SUPABASE_SERVICE_ROLE_KEY: Optional[str] = None
+    SUPABASE_STORAGE_BUCKET: str = "agent-documents"
+
     # CORS
     BACKEND_CORS_ORIGINS: List[str] = [
         "http://localhost:5173",

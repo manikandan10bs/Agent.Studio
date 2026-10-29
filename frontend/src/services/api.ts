@@ -13,7 +13,17 @@ import {
   PublicAgent
 } from '../types';
 
-const API_BASE = '/api';
+const getApiBase = (): string => {
+  const envUrl = (import.meta as any).env?.VITE_API_BASE_URL;
+  if (!envUrl) return '/api';
+  const trimmed = envUrl.trim().replace(/\/+$/, '');
+  if (!trimmed.endsWith('/api')) {
+    return `${trimmed}/api`;
+  }
+  return trimmed;
+};
+
+const API_BASE = getApiBase();
 
 function getHeaders(isJson = true): HeadersInit {
   const token = localStorage.getItem('agent_studio_token');

@@ -1,6 +1,8 @@
+import os
 import json
 import logging
 from sqlalchemy.orm import Session
+from app.core.config import settings
 from app.models.knowledge import Document, DocumentChunk
 from app.services.rag.extractor import extract_text_from_file
 from app.services.rag.chunker import chunk_text
@@ -27,7 +29,18 @@ def process_document_sync(document_id: int, db: Session) -> bool:
     db.commit()
 
     try:
-        sections = extract_text_from_file(doc.storage_path, doc.file_type)
+        path_to_extract = doc.storage_path
+        if doc.storage_path.startswith("supabase://") and not os.path.exists(doc.storage_path):
+            import asyncio
+            from app.services.storage import storage_service
+            raw_bytes = asyncio.run(storage_service.get_file_bytes(doc.storage_path))
+            temp_local = os.path.join(settings.STORAGE_DIR, f"temp_{doc.id}_{doc.filename}")
+            os.makedirs(settings.STORAGE_DIR, exist_ok=True)
+            with open(temp_local, "wb") as f:
+                f.write(raw_bytes)
+            path_to_extract = temp_local
+
+        sections = extract_text_from_file(path_to_extract, doc.file_type)
         chunks = chunk_text(sections, doc.filename)
         
         if not chunks:

@@ -11,6 +11,7 @@ from app.models.user import User
 from app.schemas.knowledge import KnowledgeBaseCreate, KnowledgeBaseOut, DocumentOut
 from app.api.deps import get_current_user, log_audit
 from app.services.rag.rag_service import process_document_sync
+from app.services.storage import storage_service
 
 router = APIRouter()
 
@@ -109,23 +110,34 @@ async def upload_agent_document(
             detail=f"Unsupported file type .{ext}. Supported formats: PDF, TXT, DOCX"
         )
 
-    # Prepare storage directory
+    # Validate file size
+    content = await file.read()
+    if len(content) > MAX_FILE_SIZE_BYTES:
+        raise HTTPException(status_code=400, detail="File exceeds max allowable size of 25MB.")
+
+    # Prepare file name
     os.makedirs(settings.STORAGE_DIR, exist_ok=True)
     saved_filename = f"{kb.id}_{int(os.path.getmtime(settings.STORAGE_DIR) if os.path.exists(settings.STORAGE_DIR) else 1)}_{filename}"
-    file_path = os.path.join(settings.STORAGE_DIR, saved_filename)
+    
+    # Upload to Supabase Storage if configured, or save locally
+    storage_path, _ = await storage_service.upload_file(
+        saved_filename,
+        content,
+        file.content_type or "application/octet-stream"
+    )
 
-    with open(file_path, "wb") as buffer:
-        content = await file.read()
-        if len(content) > MAX_FILE_SIZE_BYTES:
-            raise HTTPException(status_code=400, detail="File exceeds max allowable size of 25MB.")
-        buffer.write(content)
+    # Ensure local copy exists for immediate local text extraction
+    local_path = os.path.join(settings.STORAGE_DIR, saved_filename)
+    if not os.path.exists(local_path):
+        with open(local_path, "wb") as buffer:
+            buffer.write(content)
 
     doc = Document(
         knowledge_base_id=kb.id,
         filename=filename,
         file_type=ext,
         file_size=len(content),
-        storage_path=file_path,
+        storage_path=storage_path,
         status="uploading"
     )
     db.add(doc)
