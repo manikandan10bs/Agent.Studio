@@ -255,7 +255,7 @@ export const AgentForm: React.FC<AgentFormProps> = ({
   ];
 
   return (
-    <div className="flex-1 h-full min-h-0 overflow-y-auto overflow-x-hidden pr-2 pb-44 space-y-4 scroll-smooth">
+    <div className="flex-1 h-full min-h-0 overflow-y-auto overflow-x-hidden pr-2 pb-24 space-y-4 scroll-smooth">
       {/* 1. Top Header matching screenshot */}
       <div className="flex items-center justify-between pb-3.5 mb-2 border-b border-slate-200 flex-shrink-0">
         <div className="flex items-center gap-2.5">
@@ -422,9 +422,9 @@ export const AgentForm: React.FC<AgentFormProps> = ({
           </div>
 
           {/* Card Body: 7 Sub-tabs Left Strip + Right Content Area */}
-          <div className="flex flex-col md:flex-row min-h-[440px]">
+          <div className="flex flex-col md:flex-row min-h-[460px] md:max-h-[680px]">
             {/* Left Vertical Sub-Tab Strip */}
-            <div className="w-full md:w-52 border-b md:border-b-0 md:border-r border-slate-100 bg-slate-50/70 p-3 space-y-1 flex-shrink-0">
+            <div className="w-full md:w-52 border-b md:border-b-0 md:border-r border-slate-100 bg-slate-50/70 p-3 space-y-1 flex-shrink-0 overflow-y-auto">
               {subTabs.map((tab) => {
                 const Icon = tab.icon;
                 const isActive = activeSubTab === tab.id;
@@ -455,7 +455,7 @@ export const AgentForm: React.FC<AgentFormProps> = ({
             </div>
 
             {/* Right Content Area */}
-            <div className="flex-1 p-5 sm:p-6">
+            <div className="flex-1 p-5 sm:p-6 overflow-y-auto min-h-0">
               {/* SUB-TAB 1: MODEL (Only Model Selection, NO API Key configuration) */}
               {activeSubTab === 'model' && (
                 <div className="space-y-6 animate-in fade-in duration-150">
@@ -767,7 +767,7 @@ export const AgentForm: React.FC<AgentFormProps> = ({
 
               {/* SUB-TAB 5: TOOLS & CAPABILITIES */}
               {activeSubTab === 'tools' && (
-                <div className="space-y-4 animate-in fade-in duration-150">
+                <div className="space-y-4 animate-in fade-in duration-150 flex flex-col">
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-2 border-b border-slate-100">
                     <div>
                       <h3 className="text-xs font-bold text-slate-900 uppercase tracking-wide flex items-center gap-2">
@@ -821,8 +821,9 @@ export const AgentForm: React.FC<AgentFormProps> = ({
                     </div>
                   </div>
 
-                  {/* Tools Grid */}
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
+                  {/* Tools Grid Container with dedicated vertical scrolling */}
+                  <div className="overflow-y-auto max-h-[460px] sm:max-h-[500px] pr-1.5 pt-1 pb-3 focus:outline-none">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     {availableTools
                       .filter((t) => {
                         const matchesCat = toolsCategory === 'All' || t.category === toolsCategory;
@@ -926,6 +927,7 @@ export const AgentForm: React.FC<AgentFormProps> = ({
                           </div>
                         );
                       })}
+                    </div>
                   </div>
                 </div>
               )}
