@@ -321,6 +321,10 @@ def delete_agent(
     if current_user.role != "admin" and agent.creator_id != current_user.id:
         raise HTTPException(status_code=403, detail="Not authorized to delete this agent.")
 
+    # Nullify or delete related records to prevent SQLite FK constraint issues
+    from app.models.tool import ToolExecutionLog
+    db.query(ToolExecutionLog).filter(ToolExecutionLog.agent_id == agent_id).update({"agent_id": None})
+    
     db.delete(agent)
     db.commit()
     log_audit(db, "DELETE_AGENT", "agent", str(agent_id), user=current_user)

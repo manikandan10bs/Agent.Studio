@@ -159,6 +159,14 @@ export const api = {
     return handleResponse<Agent>(res);
   },
 
+  async deleteAgent(id: number): Promise<{ message: string }> {
+    const res = await fetch(`${API_BASE}/agents/${id}`, {
+      method: 'DELETE',
+      headers: getHeaders(),
+    });
+    return handleResponse<{ message: string }>(res);
+  },
+
   // --- Knowledge & Documents ---
   async getAgentDocuments(agentId: number): Promise<Document[]> {
     const res = await fetch(`${API_BASE}/agents/${agentId}/documents`, { headers: getHeaders() });
