@@ -19,6 +19,27 @@ async def test_registry_contains_12_tools():
     }
     assert tool_ids == expected
 
+def test_gemini_declarations_schema_compliance():
+    """Verify Gemini function declarations schema rules: all ARRAY types must have items."""
+    declarations = registry.to_gemini_declarations()
+    assert len(declarations) == 12
+
+    for decl in declarations:
+        assert "name" in decl
+        assert "description" in decl
+        assert "parameters" in decl
+        params = decl["parameters"]
+        assert params["type"] == "OBJECT"
+        props = params.get("properties", {})
+        for p_name, p_val in props.items():
+            assert "type" in p_val
+            assert p_val["type"] in {"STRING", "NUMBER", "INTEGER", "BOOLEAN", "ARRAY", "OBJECT"}
+            if p_val["type"] == "ARRAY":
+                assert "items" in p_val, f"ARRAY property '{decl['name']}.{p_name}' must have 'items'"
+                assert isinstance(p_val["items"], dict)
+                assert "type" in p_val["items"]
+                assert p_val["items"]["type"] in {"STRING", "NUMBER", "INTEGER", "BOOLEAN", "ARRAY", "OBJECT"}
+
 @pytest.mark.asyncio
 async def test_calculator_tool_operations():
     calc = registry.get("calculator")

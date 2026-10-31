@@ -58,6 +58,7 @@ class ChartGeneratorTool(BaseTool):
             },
             "data": {
                 "type": "array",
+                "items": {"type": "object"},
                 "description": "Optional inline array of data records if no file is provided."
             }
         },

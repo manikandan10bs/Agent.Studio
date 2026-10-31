@@ -17,6 +17,36 @@ class GeminiAdapter(BaseLLMAdapter):
         "gemini-flash": "gemini-flash-lite-latest",
     }
 
+    @staticmethod
+    def _sanitize_tool_declarations(tools: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        """Ensure all tools strictly comply with Gemini schema specifications (e.g. ARRAY must have items)."""
+        def _sanitize_schema(node: Any) -> Any:
+            if not isinstance(node, dict):
+                return node
+            sanitized = dict(node)
+            node_type = sanitized.get("type", "")
+            if isinstance(node_type, str) and node_type.upper() == "ARRAY":
+                sanitized["type"] = "ARRAY"
+                if "items" not in sanitized or not isinstance(sanitized["items"], dict):
+                    sanitized["items"] = {"type": "STRING"}
+                else:
+                    sanitized["items"] = _sanitize_schema(sanitized["items"])
+            elif isinstance(node_type, str) and node_type.upper() == "OBJECT":
+                sanitized["type"] = "OBJECT"
+                if "properties" in sanitized and isinstance(sanitized["properties"], dict):
+                    sanitized["properties"] = {
+                        k: _sanitize_schema(v) for k, v in sanitized["properties"].items()
+                    }
+            return sanitized
+
+        sanitized_tools = []
+        for tool in tools:
+            tool_copy = dict(tool)
+            if "parameters" in tool_copy and isinstance(tool_copy["parameters"], dict):
+                tool_copy["parameters"] = _sanitize_schema(tool_copy["parameters"])
+            sanitized_tools.append(tool_copy)
+        return sanitized_tools
+
     def _resolve_model(self, model: Optional[str]) -> str:
         target = model or self.DEFAULT_MODEL
         return self.MODEL_ALIASES.get(target, target)
@@ -59,7 +89,8 @@ class GeminiAdapter(BaseLLMAdapter):
             }
 
         if tools and len(tools) > 0:
-            payload["tools"] = [{"function_declarations": tools}]
+            sanitized_tools = self._sanitize_tool_declarations(tools)
+            payload["tools"] = [{"function_declarations": sanitized_tools}]
 
         start_time = time.time()
         async with httpx.AsyncClient(timeout=60.0) as client:

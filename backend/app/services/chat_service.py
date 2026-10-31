@@ -191,7 +191,7 @@ async def handle_agent_chat(
                         "parts": [{"functionCall": {"name": call_name, "args": call_args}}]
                     })
                     raw_contents.append({
-                        "role": "function",
+                        "role": "user",
                         "parts": [{
                             "functionResponse": {
                                 "name": call_name,
@@ -441,7 +441,7 @@ async def stream_agent_chat_generator(
                         "parts": [{"functionCall": {"name": call_name, "args": call_args}}]
                     })
                     raw_contents.append({
-                        "role": "function",
+                        "role": "user",
                         "parts": [{
                             "functionResponse": {
                                 "name": call_name,

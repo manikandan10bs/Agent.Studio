@@ -45,28 +45,54 @@ class BaseTool(ABC):
             "permission_required": self.permission_required,
         }
 
+    @staticmethod
+    def _convert_schema_node(prop_data: Dict[str, Any]) -> Dict[str, Any]:
+        raw_type = prop_data.get("type", "string").upper()
+        type_map = {
+            "INT": "INTEGER",
+            "INTEGER": "INTEGER",
+            "FLOAT": "NUMBER",
+            "NUMBER": "NUMBER",
+            "DICT": "OBJECT",
+            "OBJECT": "OBJECT",
+            "LIST": "ARRAY",
+            "ARRAY": "ARRAY",
+            "BOOL": "BOOLEAN",
+            "BOOLEAN": "BOOLEAN",
+            "STR": "STRING",
+            "STRING": "STRING",
+        }
+        prop_type = type_map.get(raw_type, "STRING")
+        node: Dict[str, Any] = {"type": prop_type}
+
+        if "description" in prop_data:
+            node["description"] = prop_data["description"]
+        if "enum" in prop_data:
+            node["enum"] = prop_data["enum"]
+
+        if prop_type == "ARRAY":
+            items = prop_data.get("items")
+            if isinstance(items, dict):
+                node["items"] = BaseTool._convert_schema_node(items)
+            else:
+                node["items"] = {"type": "STRING"}
+        elif prop_type == "OBJECT":
+            sub_props = prop_data.get("properties")
+            if isinstance(sub_props, dict) and sub_props:
+                node["properties"] = {
+                    k: BaseTool._convert_schema_node(v) for k, v in sub_props.items()
+                }
+            if "required" in prop_data and isinstance(prop_data["required"], list):
+                node["required"] = prop_data["required"]
+
+        return node
+
     def to_gemini_declaration(self) -> Dict[str, Any]:
         """Convert input schema to Gemini function_declaration format."""
         schema_props = self.input_schema.get("properties", {})
         converted_props = {}
         for prop_name, prop_data in schema_props.items():
-            prop_type = prop_data.get("type", "string").upper()
-            if prop_type == "INT":
-                prop_type = "INTEGER"
-            elif prop_type == "FLOAT":
-                prop_type = "NUMBER"
-            elif prop_type == "DICT":
-                prop_type = "OBJECT"
-            elif prop_type == "LIST":
-                prop_type = "ARRAY"
-            
-            p_dict = {
-                "type": prop_type,
-                "description": prop_data.get("description", prop_name)
-            }
-            if "enum" in prop_data:
-                p_dict["enum"] = prop_data["enum"]
-            converted_props[prop_name] = p_dict
+            converted_props[prop_name] = self._convert_schema_node(prop_data)
 
         return {
             "name": self.id,
