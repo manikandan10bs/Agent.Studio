@@ -32,11 +32,23 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [loading, setLoading] = useState(true);
   const isFirebaseActive = isFirebaseConfigured();
 
+  const syncPromiseRef = React.useRef<Promise<User> | null>(null);
+
   const syncBackendUser = async (idToken: string): Promise<User> => {
     localStorage.setItem('agent_studio_token', idToken);
-    const u = await api.getCurrentUser();
-    setUser(u);
-    return u;
+    if (syncPromiseRef.current) {
+      return syncPromiseRef.current;
+    }
+    syncPromiseRef.current = (async () => {
+      try {
+        const u = await api.getCurrentUser();
+        setUser(u);
+        return u;
+      } finally {
+        syncPromiseRef.current = null;
+      }
+    })();
+    return syncPromiseRef.current;
   };
 
   const refreshUser = async () => {

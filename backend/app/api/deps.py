@@ -8,34 +8,39 @@ from app.core.security import decode_access_token
 from app.core.firebase import verify_firebase_token
 from app.services.firestore_service import FirestoreService
 from app.core.config import settings
-from app.models.user import User
+from app.models.user import User, UserQuota
 from app.models.usage import AuditLog
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/auth/login", auto_error=False)
 
 def _get_or_sync_firebase_user(claims: dict, db: Session) -> Optional[User]:
-    email = claims.get("email")
-    if not email:
+    raw_email = claims.get("email")
+    if not raw_email:
         return None
+    email = raw_email.strip().lower()
     
     admin_emails = {
         "manikandan10bs@gmail.com",
         "admin@agent.studio",
         settings.DEFAULT_ADMIN_EMAIL.lower()
     }
-    is_default_admin = email.lower() in admin_emails
+    is_default_admin = email in admin_emails
 
-    user = db.query(User).filter(User.email == email).first()
+    user = db.query(User).filter(User.email.ilike(email)).first()
     if not user:
         role = "admin" if is_default_admin else "creator"
         user = User(
             email=email,
-            full_name=claims.get("name") or email.split("@")[0],
+            full_name=claims.get("name") or email.split("@")[0].title(),
             hashed_password="firebase_authenticated_account",
             role=role,
             is_active=True
         )
         db.add(user)
+        db.flush()
+        # Ensure quota record exists
+        quota = UserQuota(user_id=user.id)
+        db.add(quota)
         db.commit()
         db.refresh(user)
     else:

@@ -2,6 +2,8 @@ import os
 import json
 import logging
 from typing import Optional, Dict, Any
+import jwt
+from jwt import PyJWKClient
 import firebase_admin
 from firebase_admin import credentials, auth
 from google.cloud import firestore
@@ -10,6 +12,17 @@ logger = logging.getLogger("agent_studio.firebase")
 
 _firebase_app: Optional[firebase_admin.App] = None
 _firestore_client: Optional[firestore.Client] = None
+_jwk_client: Optional[PyJWKClient] = None
+
+def get_jwk_client(refresh: bool = False) -> PyJWKClient:
+    global _jwk_client
+    if _jwk_client is None or refresh:
+        _jwk_client = PyJWKClient(
+            "https://www.googleapis.com/service_accounts/v1/jwk/securetoken@system.gserviceaccount.com",
+            cache_jwk_set=not refresh,
+            lifespan=3600
+        )
+    return _jwk_client
 
 def init_firebase() -> Optional[firebase_admin.App]:
     """
@@ -76,18 +89,56 @@ def init_firebase() -> Optional[firebase_admin.App]:
 
 def verify_firebase_token(token: str) -> Optional[Dict[str, Any]]:
     """
-    Verifies a Firebase ID token. Returns the decoded token payload dict if valid,
-    or None if invalid or Firebase is not configured.
+    Verifies a Firebase ID token.
+    1. First tries Firebase Admin SDK (if service credentials exist).
+    2. Fallbacks to Google's public JWKS cryptographic verification (works 100% credential-free).
     """
-    app = init_firebase()
-    if not app:
+    if not token or not isinstance(token, str):
         return None
+
+    from app.core.config import settings
+    project_id = (
+        getattr(settings, "FIREBASE_PROJECT_ID", None)
+        or os.getenv("FIREBASE_PROJECT_ID")
+        or "agent-studio-def1d"
+    )
+
+    # 1. Try Firebase Admin SDK if initialized with credentials
     try:
-        decoded_token = auth.verify_id_token(token, app=app)
-        return decoded_token
+        app = init_firebase()
+        if app:
+            return auth.verify_id_token(token, app=app)
     except Exception as e:
-        logger.debug("Firebase ID token verification failed: %s", e)
-        return None
+        logger.debug("Firebase Admin verify_id_token skipped/failed: %s", e)
+
+    # 2. Cryptographic verification via Google's public JWKS (works without service account)
+    try:
+        client = get_jwk_client()
+        signing_key = client.get_signing_key_from_jwt(token)
+        payload = jwt.decode(
+            token,
+            signing_key.key,
+            algorithms=["RS256"],
+            audience=project_id,
+            issuer=f"https://securetoken.google.com/{project_id}"
+        )
+        return payload
+    except Exception as err:
+        # Cache might be stale or first fetch failed; retry once with a fresh client
+        try:
+            fresh_client = get_jwk_client(refresh=True)
+            signing_key = fresh_client.get_signing_key_from_jwt(token)
+            payload = jwt.decode(
+                token,
+                signing_key.key,
+                algorithms=["RS256"],
+                audience=project_id,
+                issuer=f"https://securetoken.google.com/{project_id}"
+            )
+            return payload
+        except Exception as retry_err:
+            logger.debug("Firebase JWKS verification failed: %s (initial error: %s)", retry_err, err)
+            return None
 
 def get_firestore_client() -> Optional[firestore.Client]:
     """
