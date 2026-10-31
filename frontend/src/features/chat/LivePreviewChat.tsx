@@ -22,19 +22,23 @@ import {
   History,
   Plus,
   Trash2,
-  Clock
+  Clock,
+  Mic,
+  X
 } from 'lucide-react';
 
 interface LivePreviewChatProps {
   agent: Agent;
-  isExpanded: boolean;
-  onToggleExpand: () => void;
+  isExpanded?: boolean;
+  onToggleExpand?: () => void;
+  onClose?: () => void;
 }
 
 export const LivePreviewChat: React.FC<LivePreviewChatProps> = ({
   agent,
-  isExpanded,
+  isExpanded = false,
   onToggleExpand,
+  onClose,
 }) => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputValue, setInputValue] = useState('');
@@ -273,14 +277,10 @@ export const LivePreviewChat: React.FC<LivePreviewChatProps> = ({
   return (
     <div className="flex flex-col h-full rounded-2xl bg-white border border-slate-200 shadow-sm overflow-hidden relative">
       {/* Header */}
-      <div className="flex items-center justify-between px-4 py-3 border-b border-slate-200 bg-slate-50/80 flex-wrap gap-2">
+      <div className="flex items-center justify-between px-4 py-3 border-b border-slate-200 bg-white flex-wrap gap-2">
         <div className="flex items-center gap-2">
-          <span className="relative flex h-2 w-2">
-            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-            <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
-          </span>
-          <span className="text-xs font-bold text-slate-800 uppercase tracking-wider">
-            Demo Mode
+          <span className="text-sm font-bold text-slate-900 tracking-tight">
+            Quick test
           </span>
           {agent.capability_memory ? (
             <span className="text-[10px] px-2 py-0.5 rounded-full font-semibold border bg-emerald-50 text-emerald-700 border-emerald-200">
@@ -291,8 +291,8 @@ export const LivePreviewChat: React.FC<LivePreviewChatProps> = ({
               Memory Off
             </span>
           )}
-          <span className="text-[11px] text-slate-500 hidden sm:inline">
-            • {agent.base_model_name || 'No model chosen'}
+          <span className="text-[11px] text-slate-400 hidden sm:inline">
+            • {agent.base_model_name || 'Gemini 2.5 Flash'}
           </span>
         </div>
 
@@ -317,31 +317,42 @@ export const LivePreviewChat: React.FC<LivePreviewChatProps> = ({
           <button
             type="button"
             onClick={handleStartNewChat}
-            className="p-1.5 rounded-lg text-slate-500 hover:text-slate-900 hover:bg-slate-200 transition-colors"
+            className="p-1.5 rounded-lg text-slate-500 hover:text-slate-900 hover:bg-slate-100 transition-colors"
             title="Start New Conversation"
           >
             <Plus className="w-3.5 h-3.5" />
           </button>
 
-          {messages.length > 0 && (
+          <button
+            type="button"
+            onClick={handleResetChat}
+            className="p-1.5 rounded-lg text-slate-500 hover:text-slate-900 hover:bg-slate-100 transition-colors"
+            title="Reset Chat"
+          >
+            <RotateCcw className="w-3.5 h-3.5" />
+          </button>
+
+          {onToggleExpand && (
             <button
               type="button"
-              onClick={handleResetChat}
-              className="p-1.5 rounded-lg text-slate-500 hover:text-slate-900 hover:bg-slate-200 transition-colors"
-              title="Reset Chat"
+              onClick={onToggleExpand}
+              className="p-1.5 rounded-lg text-slate-500 hover:text-slate-900 hover:bg-slate-100 transition-colors"
+              title={isExpanded ? 'Collapse' : 'Expand'}
             >
-              <RotateCcw className="w-3.5 h-3.5" />
+              {isExpanded ? <Minimize2 className="w-3.5 h-3.5" /> : <Maximize2 className="w-3.5 h-3.5" />}
             </button>
           )}
 
-          <button
-            type="button"
-            onClick={onToggleExpand}
-            className="p-1.5 rounded-lg text-slate-500 hover:text-slate-900 hover:bg-slate-200 transition-colors"
-            title={isExpanded ? 'Collapse' : 'Expand'}
-          >
-            {isExpanded ? <Minimize2 className="w-3.5 h-3.5" /> : <Maximize2 className="w-3.5 h-3.5" />}
-          </button>
+          {onClose && (
+            <button
+              type="button"
+              onClick={onClose}
+              className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors"
+              title="Close Quick Test"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          )}
         </div>
       </div>
 
@@ -419,20 +430,21 @@ export const LivePreviewChat: React.FC<LivePreviewChatProps> = ({
       )}
 
       {/* Chat Messages Area */}
-      <div className="flex-1 overflow-y-auto p-4 sm:p-5 space-y-4 bg-[#FAFCFF] bg-studio-dots-subtle">
+      <div className="flex-1 overflow-y-auto p-4 sm:p-5 space-y-4 bg-white">
         {messages.length === 0 ? (
-          <div className="flex flex-col items-center justify-center h-full text-center max-w-sm mx-auto my-auto py-8 select-none">
-            <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-blue-600 to-indigo-600 shadow-md flex items-center justify-center mb-3">
-              <Sparkles className="w-6 h-6 text-white" />
+          <div className="flex flex-col items-center justify-center h-full text-center max-w-md mx-auto my-auto py-8 px-4 select-none animate-in fade-in">
+            <div className="w-10 h-10 rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center mb-4">
+              <Sparkles className="w-6 h-6 text-blue-500 fill-blue-500" />
             </div>
-            <h3 className="text-sm font-bold text-slate-900">{agent.name || 'AGENT.STUDIO'}</h3>
-            <p className="text-xs text-slate-500 mt-1 leading-relaxed">
-              {agent.description ||
-                'Precision-built AI agent with multi-gateway routing and vector RAG grounding.'}
+            <h2 className="text-xl font-bold text-slate-900 tracking-tight">
+              Welcome to AGENT.STUDIO
+            </h2>
+            <p className="text-xs text-slate-500 mt-2 leading-relaxed max-w-sm">
+              Build, automate, and collaborate with intelligent AI agents workflows — all from a single conversation.
             </p>
 
             {(agent.conversation_starters || []).length > 0 && (
-              <div className="w-full mt-6 space-y-1.5">
+              <div className="w-full mt-6 space-y-1.5 max-w-xs">
                 <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider block text-left">
                   Sample Prompts
                 </span>
@@ -441,7 +453,7 @@ export const LivePreviewChat: React.FC<LivePreviewChatProps> = ({
                     <button
                       key={i}
                       onClick={() => handleSendMessage(starter)}
-                      className="text-left text-xs p-2.5 rounded-xl bg-white hover:bg-blue-50 border border-slate-200 hover:border-blue-300 text-slate-700 hover:text-blue-900 transition-all shadow-xs"
+                      className="text-left text-xs p-2.5 rounded-xl bg-slate-50 hover:bg-blue-50 border border-slate-200 hover:border-blue-300 text-slate-700 hover:text-blue-900 transition-all shadow-2xs"
                     >
                       <span className="text-blue-600 font-bold mr-1.5">›</span>
                       {starter}
@@ -590,14 +602,14 @@ export const LivePreviewChat: React.FC<LivePreviewChatProps> = ({
         <div ref={messagesEndRef} />
       </div>
 
-      {/* Composer at Bottom */}
-      <div className="p-3 border-t border-slate-200 bg-white">
+      {/* Composer at Bottom matching Image 4 */}
+      <div className="p-3 border-t border-slate-100 bg-white">
         <form
           onSubmit={(e) => {
             e.preventDefault();
             handleSendMessage();
           }}
-          className="flex items-end rounded-xl bg-slate-50 border border-slate-200 focus-within:border-blue-500 focus-within:bg-white p-2 transition-all shadow-xs"
+          className="rounded-2xl bg-white border border-slate-200/90 shadow-sm focus-within:border-blue-400 p-2.5 transition-all flex flex-col justify-between"
         >
           <textarea
             ref={textareaRef}
@@ -614,18 +626,49 @@ export const LivePreviewChat: React.FC<LivePreviewChatProps> = ({
                 handleSendMessage();
               }
             }}
-            placeholder="Ask agent a question... (Enter to send, Shift+Enter for newline)"
+            placeholder="Type a message"
             disabled={isGenerating}
-            className="flex-1 max-h-28 bg-transparent text-xs sm:text-sm text-slate-900 placeholder-slate-400 focus:outline-none resize-none px-2 py-1 leading-relaxed"
+            className="w-full bg-transparent text-xs sm:text-sm text-slate-900 placeholder-slate-400 focus:outline-none resize-none px-1.5 py-1 leading-relaxed min-h-[36px]"
           />
 
-          <button
-            type="submit"
-            disabled={isGenerating || !inputValue.trim()}
-            className="p-2 rounded-lg bg-[#0F172A] hover:bg-[#1E293B] text-white disabled:opacity-30 disabled:cursor-not-allowed transition-all shadow-sm flex-shrink-0"
-          >
-            <Send className="w-3.5 h-3.5" />
-          </button>
+          <div className="flex items-center justify-between pt-1 mt-1 border-t border-slate-100/60">
+            {/* Left controls: Plus button + Agent pill */}
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                className="p-1.5 rounded-lg text-slate-500 hover:text-slate-900 hover:bg-slate-100 transition-colors"
+                title="Add attachment"
+              >
+                <Plus className="w-4 h-4" />
+              </button>
+
+              <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-slate-100/80 hover:bg-slate-200 text-xs font-semibold text-slate-700 transition-colors cursor-pointer">
+                <Bot className="w-3.5 h-3.5 text-blue-600" />
+                <span className="truncate max-w-[120px]">{agent.name || 'Agent'}</span>
+                <ChevronDown className="w-3 h-3 text-slate-400" />
+              </div>
+            </div>
+
+            {/* Right controls: Mic + Send */}
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                className="p-2 rounded-full text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors"
+                title="Voice input"
+              >
+                <Mic className="w-4 h-4" />
+              </button>
+
+              <button
+                type="submit"
+                disabled={isGenerating || !inputValue.trim()}
+                className="p-2 rounded-xl bg-[#0B1320] hover:bg-slate-800 text-white disabled:opacity-30 disabled:cursor-not-allowed transition-all shadow-sm flex items-center justify-center flex-shrink-0"
+                title="Send message"
+              >
+                <Send className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          </div>
         </form>
       </div>
     </div>

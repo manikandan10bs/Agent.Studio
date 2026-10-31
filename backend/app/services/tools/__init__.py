@@ -19,8 +19,12 @@ from app.services.tools.utility_tools import (
 from app.services.tools.ai_tools import (
     TextSummarizerTool,
 )
+from app.services.tools.web_tools import (
+    WebSearchTool,
+    WebFetchTool,
+)
 
-# Register the 12 Core Tools
+# Register the Tools
 CORE_TOOLS = [
     # 1. Documents & Files
     PdfExtractorTool(),
@@ -37,7 +41,10 @@ CORE_TOOLS = [
     # 4. Validation & Utilities
     ChartGeneratorTool(),
     UrlValidatorTool(),
-    # 5. Gemini AI Tools
+    # 5. Web & Search
+    WebSearchTool(),
+    WebFetchTool(),
+    # 6. Gemini AI Tools
     TextSummarizerTool(),
 ]
 

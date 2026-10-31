@@ -10,6 +10,7 @@ from app.models.knowledge import KnowledgeBase
 from app.models.user import User
 from app.schemas.agent import AgentCreate, AgentUpdate, AgentOut
 from app.api.deps import get_current_user, log_audit
+from app.services.firestore_service import FirestoreService
 
 router = APIRouter()
 
@@ -148,7 +149,12 @@ def create_agent(
     db.refresh(agent)
 
     log_audit(db, "CREATE_AGENT", "agent", str(agent.id), user=current_user)
-    return serialize_agent(agent)
+    out = serialize_agent(agent)
+    try:
+        FirestoreService.save_agent(str(current_user.id), str(agent.id), out.model_dump())
+    except Exception:
+        pass
+    return out
 
 @router.get("/{agent_id}", response_model=AgentOut)
 def get_agent(
@@ -212,7 +218,12 @@ def update_agent(
     db.commit()
     db.refresh(agent)
     log_audit(db, "UPDATE_AGENT", "agent", str(agent.id), user=current_user)
-    return serialize_agent(agent)
+    out = serialize_agent(agent)
+    try:
+        FirestoreService.save_agent(str(agent.creator_id), str(agent.id), out.model_dump())
+    except Exception:
+        pass
+    return out
 
 @router.post("/{agent_id}/test", response_model=AgentOut)
 def test_agent_configuration(
@@ -287,7 +298,12 @@ def publish_agent(
     db.refresh(agent)
 
     log_audit(db, "PUBLISH_AGENT", "agent", str(agent.id), user=current_user)
-    return serialize_agent(agent)
+    out = serialize_agent(agent)
+    try:
+        FirestoreService.save_agent(str(agent.creator_id), str(agent.id), out.model_dump())
+    except Exception:
+        pass
+    return out
 
 @router.post("/{agent_id}/unpublish", response_model=AgentOut)
 def unpublish_agent(
@@ -307,7 +323,12 @@ def unpublish_agent(
     db.refresh(agent)
 
     log_audit(db, "UNPUBLISH_AGENT", "agent", str(agent.id), user=current_user)
-    return serialize_agent(agent)
+    out = serialize_agent(agent)
+    try:
+        FirestoreService.save_agent(str(agent.creator_id), str(agent.id), out.model_dump())
+    except Exception:
+        pass
+    return out
 
 @router.delete("/{agent_id}")
 def delete_agent(
@@ -321,6 +342,8 @@ def delete_agent(
     if current_user.role != "admin" and agent.creator_id != current_user.id:
         raise HTTPException(status_code=403, detail="Not authorized to delete this agent.")
 
+    creator_id = str(agent.creator_id)
+
     # Nullify or delete related records to prevent SQLite FK constraint issues
     from app.models.tool import ToolExecutionLog
     db.query(ToolExecutionLog).filter(ToolExecutionLog.agent_id == agent_id).update({"agent_id": None})
@@ -328,4 +351,10 @@ def delete_agent(
     db.delete(agent)
     db.commit()
     log_audit(db, "DELETE_AGENT", "agent", str(agent_id), user=current_user)
+
+    try:
+        FirestoreService.delete_agent(creator_id, str(agent_id))
+    except Exception:
+        pass
+
     return {"message": "Agent deleted successfully"}

@@ -8,21 +8,22 @@ from app.services.tools import registry
 from app.core.config import settings
 
 @pytest.mark.asyncio
-async def test_registry_contains_12_tools():
+async def test_registry_contains_all_tools():
     tools = registry.list_tools()
-    assert len(tools) == 12
+    assert len(tools) == 14
     tool_ids = {t.id for t in tools}
     expected = {
         "pdf_extractor", "docx_reader", "excel_processor", "csv_processor",
         "json_parser", "calculator", "datetime_tool", "chart_generator",
-        "url_validator", "data_cleaner", "duplicate_finder", "text_summarizer"
+        "url_validator", "data_cleaner", "duplicate_finder", "text_summarizer",
+        "web_search", "web_fetch"
     }
     assert tool_ids == expected
 
 def test_gemini_declarations_schema_compliance():
     """Verify Gemini function declarations schema rules: all ARRAY types must have items."""
     declarations = registry.to_gemini_declarations()
-    assert len(declarations) == 12
+    assert len(declarations) == 14
 
     for decl in declarations:
         assert "name" in decl
@@ -297,11 +298,11 @@ def test_api_list_tools(client, admin_headers):
     resp = client.get("/api/tools", headers=admin_headers)
     assert resp.status_code == 200
     data = resp.json()
-    assert len(data) == 12
+    assert len(data) == 14
     categories = {t["category"] for t in data}
     expected_categories = {
         "Documents & Files", "Data Processing", "Data Utilities",
-        "Validation & Utilities", "Gemini AI Tools"
+        "Validation & Utilities", "Web & Search", "Gemini AI Tools"
     }
     assert categories == expected_categories
 
@@ -339,3 +340,21 @@ def test_api_download_nonexistent_and_traversal(client, admin_headers):
     # Traversal in name should be 400
     resp_bad = client.get("/api/tools/download/..bad_file.png", headers=admin_headers)
     assert resp_bad.status_code == 400
+
+@pytest.mark.asyncio
+async def test_web_search_and_web_fetch():
+    ws = registry.get("web_search")
+    assert ws is not None
+    # Empty query validation
+    res = await ws.execute({"query": ""})
+    assert res.success is False
+
+    wf = registry.get("web_fetch")
+    assert wf is not None
+    # Empty url validation
+    res2 = await wf.execute({"url": ""})
+    assert res2.success is False
+    # SSRF protection test
+    res3 = await wf.execute({"url": "http://127.0.0.1:8000/api/admin"})
+    assert res3.success is False
+    assert "Security check failed" in res3.error

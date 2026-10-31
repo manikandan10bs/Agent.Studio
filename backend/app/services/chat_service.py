@@ -9,6 +9,7 @@ from app.services.llm.base import LLMMessage, LLMResponse
 from app.services.llm.factory import get_adapter_for_model
 from app.services.rag.retriever import retrieve_agent_chunks
 from app.services.rag.rag_service import augment_prompt_with_rag
+from app.services.firestore_service import FirestoreService
 
 async def handle_agent_chat(
     agent_id: int,
@@ -235,6 +236,19 @@ async def handle_agent_chat(
         db.add(usage_event)
         db.commit()
         db.refresh(asst_msg_record)
+
+        try:
+            FirestoreService.record_execution(
+                user_id=str(user_id or "anonymous"),
+                execution_id=str(asst_msg_record.id),
+                agent_id=str(agent.id),
+                input_data=user_message,
+                output_data=asst_msg_record.content,
+                status="success",
+                execution_time_ms=latency_ms
+            )
+        except Exception:
+            pass
 
         return conversation, asst_msg_record, citations
 
@@ -495,6 +509,19 @@ async def stream_agent_chat_generator(
         )
         db.add(usage_event)
         db.commit()
+
+        try:
+            FirestoreService.record_execution(
+                user_id=str(user_id or "anonymous"),
+                execution_id=str(asst_msg_record.id),
+                agent_id=str(agent.id),
+                input_data=user_message,
+                output_data=full_response_text,
+                status="success",
+                execution_time_ms=latency_ms
+            )
+        except Exception:
+            pass
 
         yield f"data: {json.dumps({'done': True, 'message_id': asst_msg_record.id, 'type': 'done'})}\n\n"
 

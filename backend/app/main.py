@@ -19,6 +19,13 @@ async def lifespan(app: FastAPI):
     finally:
         db.close()
     
+    # Initialize Firebase if configured
+    try:
+        from app.core.firebase import init_firebase
+        init_firebase()
+    except Exception as e:
+        logger.warning("Firebase init in lifespan skipped: %s", e)
+
     # Ensure upload storage folder exists
     os.makedirs(settings.STORAGE_DIR, exist_ok=True)
     yield
@@ -37,11 +44,17 @@ if settings.FRONTEND_URL and settings.FRONTEND_URL.strip():
     if clean_fe not in cors_origins:
         cors_origins.append(clean_fe)
 
-# CORS configuration supporting localhost, custom domains, and Vercel preview/production deployments
+if getattr(settings, "CORS_ORIGINS", None) and settings.CORS_ORIGINS.strip():
+    for origin in settings.CORS_ORIGINS.split(","):
+        origin_clean = origin.strip().rstrip("/")
+        if origin_clean and origin_clean not in cors_origins:
+            cors_origins.append(origin_clean)
+
+# CORS configuration supporting localhost, custom domains, Firebase Hosting, Cloud Run, and Vercel
 app.add_middleware(
     CORSMiddleware,
     allow_origins=cors_origins,
-    allow_origin_regex=r"https://.*\.vercel\.app",
+    allow_origin_regex=r"https://.*(\.web\.app|\.firebaseapp\.com|\.run\.app|\.vercel\.app)",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

@@ -24,6 +24,12 @@ class Settings(BaseSettings):
     SUPABASE_SERVICE_ROLE_KEY: Optional[str] = None
     SUPABASE_STORAGE_BUCKET: str = "agent-documents"
 
+    # Firebase & Google Cloud
+    FIREBASE_PROJECT_ID: Optional[str] = None
+    FIREBASE_CREDENTIALS_PATH: Optional[str] = None
+    FIREBASE_CREDENTIALS_JSON: Optional[str] = None
+    USE_FIRESTORE: bool = True
+
     # CORS
     BACKEND_CORS_ORIGINS: List[str] = [
         "http://localhost:5173",
@@ -33,9 +39,10 @@ class Settings(BaseSettings):
         "http://localhost:8000",
         "http://127.0.0.1:8000"
     ]
+    CORS_ORIGINS: Optional[str] = None
 
     # Default Seed Administrator
-    DEFAULT_ADMIN_EMAIL: str = "admin@agent.studio"
+    DEFAULT_ADMIN_EMAIL: str = "manikandan10bs@gmail.com"
     DEFAULT_ADMIN_PASSWORD: str = "Admin@Studio2026"
     DEFAULT_ADMIN_NAME: str = "Platform Administrator"
 

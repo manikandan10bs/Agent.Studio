@@ -189,6 +189,18 @@ def update_user_status(
     db.commit()
     db.refresh(user)
     log_audit(db, "ADMIN_UPDATE_USER", "user", str(user.id), user=admin)
+
+    try:
+        from app.services.firestore_service import FirestoreService
+        FirestoreService.sync_user_profile(
+            user_id=str(user.id),
+            email=user.email,
+            name=user.full_name,
+            role=user.role
+        )
+    except Exception:
+        pass
+
     return user
 
 # --- Providers & Model Administration ---

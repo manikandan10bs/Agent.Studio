@@ -14,6 +14,7 @@ import {
   Copy,
   Cpu,
   Search,
+  Globe,
   Filter,
   CheckCircle2,
   AlertTriangle,
@@ -37,6 +38,7 @@ const CATEGORIES = [
   'Data Processing',
   'Data Utilities',
   'Validation & Utilities',
+  'Web & Search',
   'Gemini AI Tools'
 ] as const;
 
@@ -107,6 +109,8 @@ export const ToolsMarketplace: React.FC = () => {
       case 'Sparkles': return <Sparkles className="w-5 h-5 text-teal-500" />;
       case 'Copy': return <Copy className="w-5 h-5 text-purple-500" />;
       case 'Cpu': return <Cpu className="w-5 h-5 text-pink-500" />;
+      case 'Search': return <Search className="w-5 h-5 text-blue-600" />;
+      case 'Globe': return <Globe className="w-5 h-5 text-emerald-600" />;
       default: return <Settings className="w-5 h-5 text-blue-500" />;
     }
   };
@@ -163,6 +167,10 @@ export const ToolsMarketplace: React.FC = () => {
           { Quarter: 'Q4', Revenue: 35.8 }
         ], null, 2)
       });
+    } else if (tool.id === 'web_search') {
+      setTestParams({ query: 'fastapi python tutorial', max_results: 3 });
+    } else if (tool.id === 'web_fetch') {
+      setTestParams({ url: 'https://example.com', max_characters: 2000 });
     } else if (tool.id === 'text_summarizer') {
       setTestParams({
         text: 'AGENT.STUDIO is an enterprise platform for autonomous precision AI agents. It provides a modular 12-core tool catalog, multi-provider model routing across Google Gemini, GroqCloud, OpenRouter, and Mistral, and integrated retrieval-augmented generation. Security governance ensures loopback and private IP SSRF attacks are prevented and data operations are processed within sandboxed local runtimes.',

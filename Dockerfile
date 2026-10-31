@@ -12,13 +12,18 @@ COPY frontend/ ./
 RUN npm run build
 
 # ==========================================
-# STAGE 2: Python Backend with Unified Serving
+# STAGE 2: Python Backend with Cloud Run support
 # ==========================================
 FROM python:3.11-slim
 
 WORKDIR /app
 
-# Install system dependencies for psycopg2 and pdf/document processing
+ENV PYTHONDONTWRITEBYTECODE=1
+ENV PYTHONUNBUFFERED=1
+ENV PORT=8080
+ENV FRONTEND_DIST=/app/frontend/dist
+
+# Install system dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
     libpq-dev \
@@ -27,7 +32,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 # Install Python requirements
 COPY backend/requirements.txt ./backend/
-RUN pip install --no-cache-dir -r ./backend/requirements.txt psycopg2-binary email-validator
+RUN pip install --no-cache-dir -U pip && \
+    pip install --no-cache-dir -r ./backend/requirements.txt
 
 # Copy Backend application
 COPY backend/ ./backend/
@@ -35,16 +41,15 @@ COPY backend/ ./backend/
 # Copy compiled frontend from Stage 1 into frontend/dist for unified serving
 COPY --from=frontend-builder /app/frontend/dist ./frontend/dist
 
-# Copy uploads folder
+# Create uploads directory
 RUN mkdir -p /app/uploads
 
-ENV PORT=8000
-ENV PYTHONUNBUFFERED=1
-ENV FRONTEND_DIST=/app/frontend/dist
-
-EXPOSE 8000
+EXPOSE 8080
 
 WORKDIR /app/backend
 
-# Initialize DB on first run if needed, then run Uvicorn
-CMD ["sh", "-c", "python init_db.py && uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000}"]
+HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
+    CMD curl -f http://localhost:${PORT:-8080}/api/health || exit 1
+
+# Initialize DB on first run if needed, then run Uvicorn on dynamic $PORT
+CMD ["sh", "-c", "python init_db.py && exec uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8080} --workers 2"]

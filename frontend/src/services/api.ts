@@ -370,4 +370,11 @@ export const api = {
     });
     return handleResponse<{ filename: string; original_filename: string; file_size: number; file_path: string }>(res);
   },
+
+  async getExecutionHistory(limit = 50): Promise<any[]> {
+    const res = await fetch(`${API_BASE}/chat/executions?limit=${limit}`, {
+      headers: getHeaders(),
+    });
+    return handleResponse<any[]>(res);
+  },
 };

@@ -5,10 +5,57 @@ from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy.orm import Session
 from app.db.session import get_db
 from app.core.security import decode_access_token
+from app.core.firebase import verify_firebase_token
+from app.services.firestore_service import FirestoreService
+from app.core.config import settings
 from app.models.user import User
 from app.models.usage import AuditLog
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/auth/login", auto_error=False)
+
+def _get_or_sync_firebase_user(claims: dict, db: Session) -> Optional[User]:
+    email = claims.get("email")
+    if not email:
+        return None
+    
+    admin_emails = {
+        "manikandan10bs@gmail.com",
+        "admin@agent.studio",
+        settings.DEFAULT_ADMIN_EMAIL.lower()
+    }
+    is_default_admin = email.lower() in admin_emails
+
+    user = db.query(User).filter(User.email == email).first()
+    if not user:
+        role = "admin" if is_default_admin else "creator"
+        user = User(
+            email=email,
+            full_name=claims.get("name") or email.split("@")[0],
+            hashed_password="firebase_authenticated_account",
+            role=role,
+            is_active=True
+        )
+        db.add(user)
+        db.commit()
+        db.refresh(user)
+    else:
+        # Guarantee default admin always retains admin role
+        if is_default_admin and user.role != "admin":
+            user.role = "admin"
+            db.commit()
+            db.refresh(user)
+    
+    # Sync user in Firestore
+    try:
+        FirestoreService.sync_user_profile(
+            user_id=str(user.id),
+            email=user.email,
+            name=user.full_name,
+            role=user.role
+        )
+    except Exception:
+        pass
+    return user
 
 def get_current_user(
     request: Request,
@@ -26,6 +73,19 @@ def get_current_user(
             headers={"WWW-Authenticate": "Bearer"},
         )
 
+    # 1. Try Firebase Authentication ID Token verification
+    firebase_claims = verify_firebase_token(token)
+    if firebase_claims:
+        fb_user = _get_or_sync_firebase_user(firebase_claims, db)
+        if fb_user:
+            if not fb_user.is_active:
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail="User account is inactive or suspended",
+                )
+            return fb_user
+
+    # 2. Fallback to local JWT token
     payload = decode_access_token(token)
     if not payload or not payload.get("sub"):
         raise HTTPException(
@@ -60,6 +120,10 @@ def get_current_user_optional(
         token = request.cookies.get("agent_studio_token")
     if not token:
         return None
+
+    firebase_claims = verify_firebase_token(token)
+    if firebase_claims:
+        return _get_or_sync_firebase_user(firebase_claims, db)
 
     payload = decode_access_token(token)
     if not payload or not payload.get("sub"):

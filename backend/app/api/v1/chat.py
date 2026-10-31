@@ -159,3 +159,35 @@ def delete_conversation(
     db.delete(conv)
     db.commit()
     return {"message": "Conversation deleted"}
+
+@router.get("/executions")
+def get_execution_history(
+    limit: int = Query(50, ge=1, le=100),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Returns agent execution history from Firestore (with fallback to database logs).
+    """
+    from app.services.firestore_service import FirestoreService
+    from app.models.tool import ToolExecutionLog
+
+    # Try Firestore first
+    fs_executions = FirestoreService.list_executions(str(current_user.id), limit=limit)
+    if fs_executions:
+        return fs_executions
+
+    # Fallback to ToolExecutionLog
+    query = db.query(ToolExecutionLog).filter(ToolExecutionLog.user_id == current_user.id).order_by(ToolExecutionLog.created_at.desc()).limit(limit).all()
+    results = []
+    for log in query:
+        results.append({
+            "executionId": str(log.id),
+            "toolId": log.tool_id,
+            "agentId": str(log.agent_id) if log.agent_id else None,
+            "status": log.status,
+            "executionTime": log.execution_time_ms,
+            "createdAt": log.created_at.isoformat() if log.created_at else None,
+            "error": log.error_message
+        })
+    return results

@@ -29,9 +29,14 @@ def get_llm_adapter(provider_name: str, db: Session) -> BaseLLMAdapter:
     
     if not api_key:
         from app.core.config import settings
+        from app.core.secrets import get_secret
         env_key = getattr(settings, f"{provider.name.upper()}_API_KEY", None)
         if env_key and env_key.strip():
             api_key = env_key.strip()
+        else:
+            secret_key = get_secret(f"{provider.name.upper()}_API_KEY")
+            if secret_key and secret_key.strip():
+                api_key = secret_key.strip()
 
     if not api_key:
         raise ValueError(

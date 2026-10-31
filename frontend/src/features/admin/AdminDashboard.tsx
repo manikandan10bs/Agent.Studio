@@ -24,6 +24,7 @@ import {
   DollarSign,
   AlertTriangle,
   ShieldCheck,
+  Shield,
   Lock
 } from 'lucide-react';
 
@@ -165,6 +166,23 @@ export const AdminDashboard: React.FC = () => {
       loadAllAdminData();
     } catch (err: any) {
       alert(`Failed to update status: ${err.message}`);
+    }
+  };
+
+  const handleToggleUserRole = async (user: User) => {
+    const nextRole = user.role === 'admin' ? 'creator' : 'admin';
+    const isPromoting = nextRole === 'admin';
+    const confirmMsg = isPromoting
+      ? `Promote "${user.full_name || user.email}" to Administrator? They will have full access to provider keys, user management, and platform metrics.`
+      : `Change "${user.full_name || user.email}" role to Creator? They will only have access to the Creator Studio and Gallery Lobby.`;
+
+    if (!window.confirm(confirmMsg)) return;
+
+    try {
+      await api.updateUserStatus(user.id, { role: nextRole });
+      loadAllAdminData();
+    } catch (err: any) {
+      alert(`Failed to update user role: ${err.message}`);
     }
   };
 
@@ -586,10 +604,33 @@ export const AdminDashboard: React.FC = () => {
                             {u.is_active ? 'Active' : 'Suspended'}
                           </span>
                         </td>
-                        <td className="py-3 px-3 text-right">
+                        <td className="py-3 px-3 text-right space-x-1.5 whitespace-nowrap">
+                          {u.email === 'manikandan10bs@gmail.com' ? (
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-[10px] font-bold bg-amber-50 text-amber-800 border border-amber-200">
+                              <ShieldCheck className="w-3 h-3 text-amber-600" />
+                              Super Admin
+                            </span>
+                          ) : (
+                            <button
+                              onClick={() => handleToggleUserRole(u)}
+                              className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-medium transition-colors cursor-pointer ${
+                                u.role === 'admin'
+                                  ? 'bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200'
+                                  : 'bg-blue-50 hover:bg-blue-100 text-blue-800 border border-blue-200'
+                              }`}
+                              title={u.role === 'admin' ? 'Demote to Creator' : 'Promote to Admin'}
+                            >
+                              <Shield className="w-3 h-3" />
+                              <span>{u.role === 'admin' ? 'Demote to Creator' : 'Promote to Admin'}</span>
+                            </button>
+                          )}
                           <button
                             onClick={() => handleToggleUserActive(u)}
-                            className="px-2.5 py-1 rounded-lg text-[11px] bg-slate-100 hover:bg-slate-200 text-slate-700 transition-colors"
+                            className={`px-2.5 py-1 rounded-lg text-[11px] font-medium transition-colors cursor-pointer ${
+                              u.is_active
+                                ? 'bg-slate-100 hover:bg-rose-50 text-slate-700 hover:text-rose-700'
+                                : 'bg-emerald-50 hover:bg-emerald-100 text-emerald-800'
+                            }`}
                           >
                             {u.is_active ? 'Suspend' : 'Activate'}
                           </button>

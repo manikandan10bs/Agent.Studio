@@ -92,6 +92,10 @@ def init_db(db: Session) -> None:
         db.add(quota)
         db.commit()
         db.refresh(admin)
+    else:
+        if admin.role != "admin":
+            admin.role = "admin"
+            db.commit()
 
     # 2. Seed Providers and Models
     for prov_data in DEFAULT_PROVIDERS:

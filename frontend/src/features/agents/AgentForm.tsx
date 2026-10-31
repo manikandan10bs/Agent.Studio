@@ -33,6 +33,7 @@ import {
   BookOpen,
   Info,
   ChevronDown,
+  ChevronUp,
   Layers,
   ArrowLeft,
   ArrowRight,
@@ -41,6 +42,7 @@ import {
   MessageCircle,
   Lock,
   Search,
+  Globe,
   Download,
   Settings,
   Bot
@@ -52,11 +54,11 @@ interface AgentFormProps {
   onRefreshAgent: () => void;
   isSaving: boolean;
   setIsSaving: (s: boolean) => void;
-  onBackToList?: () => void;
-  draftAgents?: Agent[];
-  onSelectAgent?: (ag: Agent) => void;
-  onCreateNewAgent?: () => void;
+  isDraftSaved: boolean;
+  setIsDraftSaved: (s: boolean) => void;
+  isQuickTestOpen?: boolean;
   onQuickTest?: () => void;
+  onBackToList?: () => void;
   onAgentPublished?: () => void;
 }
 
@@ -66,13 +68,14 @@ export const AgentForm: React.FC<AgentFormProps> = ({
   onRefreshAgent,
   isSaving,
   setIsSaving,
-  onBackToList,
-  draftAgents = [],
-  onSelectAgent,
-  onCreateNewAgent,
+  isDraftSaved,
+  setIsDraftSaved,
+  isQuickTestOpen = false,
   onQuickTest,
+  onBackToList,
   onAgentPublished,
 }) => {
+  const [overviewOpen, setOverviewOpen] = useState(true);
   const [activeSubTab, setActiveSubTab] = useState<'model' | 'system' | 'skills' | 'mcp' | 'tools' | 'runtime' | 'prompts'>('model');
   const [advanceConfigOpen, setAdvanceConfigOpen] = useState(true);
   const [thinkingLevel, setThinkingLevel] = useState('Not supported');
@@ -194,24 +197,44 @@ export const AgentForm: React.FC<AgentFormProps> = ({
   };
 
   const handleSaveDraft = async () => {
+    if (!agent.name.trim()) {
+      alert('Please enter an Agent Name before saving draft.');
+      return;
+    }
     setIsSaving(true);
     setSaveMessage(null);
     try {
-      const updated = await api.updateAgent(agent.id, {
-        name: agent.name,
-        description: agent.description,
-        base_model_id: agent.base_model_id,
-        system_instructions: agent.system_instructions,
-        conversation_starters: agent.conversation_starters,
-        capability_rag: agent.capability_rag,
-        capability_memory: agent.capability_memory,
-        capability_streaming: agent.capability_streaming,
-        enabled_tools: agent.enabled_tools || [],
-        tools_config: agent.tools_config || {},
-      });
-      onAgentChange(updated);
-      setSaveMessage('Draft saved successfully');
-      setTimeout(() => setSaveMessage(null), 3000);
+      let savedAgent: Agent;
+      if (!agent.id || agent.id === 0) {
+        savedAgent = await api.createAgent({
+          name: agent.name.trim(),
+          description: agent.description?.trim() || '',
+          base_model_id: agent.base_model_id,
+          system_instructions: agent.system_instructions || 'You are a helpful and accurate precision AI assistant.',
+          conversation_starters: agent.conversation_starters || ['What can you help me with?'],
+          capability_rag: agent.capability_rag ?? true,
+          capability_memory: agent.capability_memory ?? true,
+          capability_streaming: agent.capability_streaming ?? true,
+          enabled_tools: agent.enabled_tools ?? [],
+          tools_config: agent.tools_config || {},
+        });
+      } else {
+        savedAgent = await api.updateAgent(agent.id, {
+          name: agent.name.trim(),
+          description: agent.description?.trim() || '',
+          base_model_id: agent.base_model_id,
+          system_instructions: agent.system_instructions,
+          conversation_starters: agent.conversation_starters,
+          capability_rag: agent.capability_rag,
+          capability_memory: agent.capability_memory,
+          capability_streaming: agent.capability_streaming,
+          enabled_tools: agent.enabled_tools || [],
+          tools_config: agent.tools_config || {},
+        });
+      }
+      onAgentChange(savedAgent);
+      setIsDraftSaved(true);
+      setSaveMessage('Your Agent has been saved as draft. Now You can test your Agent using Quick Test and then do the final save.');
     } catch (err: any) {
       alert(`Save failed: ${err.message}`);
     } finally {
@@ -219,16 +242,35 @@ export const AgentForm: React.FC<AgentFormProps> = ({
     }
   };
 
-  const handlePublish = async () => {
+  const handleFinalSave = async () => {
+    if (!agent.name.trim()) {
+      alert('Please enter an Agent Name.');
+      return;
+    }
     setIsSaving(true);
     try {
-      const updated = await api.publishAgent(agent.id);
+      let currentId = agent.id;
+      if (!currentId || currentId === 0) {
+        const created = await api.createAgent({
+          name: agent.name.trim(),
+          description: agent.description?.trim() || '',
+          base_model_id: agent.base_model_id,
+          system_instructions: agent.system_instructions || 'You are a helpful and accurate precision AI assistant.',
+          conversation_starters: agent.conversation_starters || ['What can you help me with?'],
+          capability_rag: agent.capability_rag ?? true,
+          capability_memory: agent.capability_memory ?? true,
+          capability_streaming: agent.capability_streaming ?? true,
+          enabled_tools: agent.enabled_tools ?? [],
+          tools_config: agent.tools_config || {},
+        });
+        currentId = created.id;
+        onAgentChange(created);
+      }
+      const updated = await api.publishAgent(currentId);
       onAgentChange(updated);
-      setSaveMessage('Agent published successfully!');
+      setIsDraftSaved(false);
       if (onAgentPublished) {
         onAgentPublished();
-      } else {
-        setShowShareModal(true);
       }
     } catch (err: any) {
       alert(`Publish failed: ${err.message}`);
@@ -237,8 +279,10 @@ export const AgentForm: React.FC<AgentFormProps> = ({
     }
   };
 
-  const handleQuickTest = async () => {
-    await handleSaveDraft();
+  const handleQuickTestClick = async () => {
+    if (!isDraftSaved || !agent.id) {
+      await handleSaveDraft();
+    }
     if (onQuickTest) {
       onQuickTest();
     }
@@ -279,110 +323,55 @@ export const AgentForm: React.FC<AgentFormProps> = ({
 
   return (
     <div className="flex-1 h-full min-h-0 overflow-y-auto overflow-x-hidden pr-2 pb-24 space-y-4 scroll-smooth">
-      {/* 0. Drafts Navigator Bar: Create a new Agent + Drafts List */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 p-3 rounded-2xl bg-white border border-slate-200/90 shadow-xs flex-shrink-0">
-        <div className="flex items-center gap-2 flex-wrap">
-          {onCreateNewAgent && (
-            <button
-              type="button"
-              onClick={onCreateNewAgent}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold text-white bg-blue-600 hover:bg-blue-700 shadow-xs transition-all"
-            >
-              <Plus className="w-3.5 h-3.5" />
-              <span>Create a new Agent</span>
-            </button>
-          )}
-
-          <div className="h-4 w-px bg-slate-200 mx-1 hidden sm:block" />
-
-          <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">
-            Draft Agents ({draftAgents.length}):
-          </span>
-
-          <div className="flex items-center gap-1.5 overflow-x-auto max-w-full pb-0.5 scrollbar-none">
-            {draftAgents.length === 0 ? (
-              <span className="text-xs text-slate-400 italic">No other drafts</span>
-            ) : (
-              draftAgents.map((ag) => {
-                const isSelected = ag.id === agent.id;
-                return (
-                  <button
-                    key={ag.id}
-                    type="button"
-                    onClick={() => onSelectAgent?.(ag)}
-                    className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium transition-all whitespace-nowrap ${
-                      isSelected
-                        ? 'bg-slate-900 text-white font-semibold shadow-xs'
-                        : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
-                    }`}
-                  >
-                    <Bot className="w-3 h-3" />
-                    <span className="truncate max-w-[120px]">{ag.name}</span>
-                    <span className={`text-[9px] px-1 py-0.2 rounded ${isSelected ? 'bg-slate-800 text-slate-300' : 'bg-slate-200 text-slate-600'}`}>
-                      v{ag.current_version}
-                    </span>
-                  </button>
-                );
-              })
-            )}
-          </div>
-        </div>
-
-        {onBackToList && (
-          <button
-            type="button"
-            onClick={onBackToList}
-            className="text-xs text-slate-500 hover:text-blue-600 font-medium self-end sm:self-auto flex items-center gap-1"
-          >
-            <span>View all drafts</span>
-            <ArrowRight className="w-3 h-3" />
-          </button>
-        )}
-      </div>
-
-      {/* 1. Top Header matching screenshot */}
+      {/* Top Header matching Images 2 & 3 */}
       <div className="flex items-center justify-between pb-3.5 mb-2 border-b border-slate-200 flex-shrink-0">
         <div className="flex items-center gap-2.5">
           <h1 className="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight">
             Create an Agent
           </h1>
-          <span
-            className={`text-[11px] px-2.5 py-0.5 rounded-full font-medium tracking-wide uppercase ${
-              agent.status === 'published'
-                ? 'bg-emerald-100 text-emerald-800 border border-emerald-200'
-                : agent.status === 'tested'
-                ? 'bg-blue-100 text-blue-800 border border-blue-200'
-                : 'bg-amber-100 text-amber-800 border border-amber-200'
-            }`}
-          >
-            {agent.status} (v{agent.current_version})
-          </span>
         </div>
 
-        {/* Top Right Action Buttons matching screenshot */}
+        {/* Top Right Action Buttons matching Images 2 & 3 */}
         <div className="flex items-center gap-2.5">
+          {/* If draft has been saved (Image 3), show Final Save */}
+          {isDraftSaved && (
+            <button
+              type="button"
+              onClick={handleFinalSave}
+              disabled={isSaving}
+              className="flex items-center justify-center px-5 py-2 rounded-xl text-xs font-semibold text-white bg-[#0F172A] hover:bg-[#1E293B] shadow-sm transition-all"
+            >
+              {isSaving ? <Loader2 className="w-3.5 h-3.5 animate-spin mr-1.5" /> : null}
+              Final Save
+            </button>
+          )}
+
+          {/* Save Draft is always available */}
           <button
             type="button"
             onClick={handleSaveDraft}
             disabled={isSaving}
             className="flex items-center justify-center px-5 py-2 rounded-xl text-xs font-semibold text-white bg-[#0F172A] hover:bg-[#1E293B] shadow-sm transition-all"
           >
-            {isSaving ? <Loader2 className="w-3.5 h-3.5 animate-spin mr-1.5" /> : null}
+            {isSaving && !isDraftSaved ? <Loader2 className="w-3.5 h-3.5 animate-spin mr-1.5" /> : null}
             Save Draft
           </button>
 
-          {/* Quick Test button near Save Draft */}
-          <button
-            type="button"
-            onClick={handleQuickTest}
-            disabled={isSaving}
-            className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-semibold text-blue-700 bg-blue-50 border border-blue-200 hover:bg-blue-100 transition-colors shadow-xs"
-            title="Save draft and test in Live Preview"
-          >
-            <Play className="w-3.5 h-3.5 fill-blue-600" />
-            Quick Test
-          </button>
+          {/* Quick Test button appears after draft is saved (Image 3) */}
+          {isDraftSaved && (
+            <button
+              type="button"
+              onClick={handleQuickTestClick}
+              disabled={isSaving}
+              className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-semibold text-white bg-[#1E40AF] hover:bg-blue-800 transition-colors shadow-xs"
+              title="Test agent in Quick Test panel"
+            >
+              <span className="font-bold">›</span>
+              Quick Test
+            </button>
+          )}
 
+          {/* Back to list button */}
           {onBackToList && (
             <button
               type="button"
@@ -393,71 +382,73 @@ export const AgentForm: React.FC<AgentFormProps> = ({
               Back to list
             </button>
           )}
-
-          {agent.status === 'published' ? (
-            <button
-              type="button"
-              onClick={() => setShowShareModal(true)}
-              className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-medium text-blue-700 bg-blue-50 border border-blue-200 hover:bg-blue-100 transition-colors shadow-xs"
-            >
-              <Share2 className="w-3.5 h-3.5" />
-              Share
-            </button>
-          ) : (
-            <button
-              type="button"
-              onClick={handlePublish}
-              disabled={isSaving}
-              className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-semibold text-white bg-blue-600 hover:bg-blue-700 shadow-xs transition-all"
-            >
-              <Rocket className="w-3.5 h-3.5" />
-              Publish
-            </button>
-          )}
         </div>
       </div>
 
-      {/* 2. Prominent Agent Identity: Name and Description */}
-      <div className="rounded-2xl bg-white border border-slate-200 p-4 sm:p-5 mb-3 shadow-xs space-y-3.5">
-        <div className="flex items-center justify-between pb-2 border-b border-slate-100">
-          <h2 className="text-xs font-bold text-slate-900 uppercase tracking-wider">
-            Agent Identity & Description
-          </h2>
-          <span className="text-[11px] text-slate-400">
-            Defines the agent's name & self-awareness
-          </span>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      {/* 2. Overview Section matching Images 2, 3 & 4 */}
+      <div className="rounded-2xl bg-white border border-slate-200 p-4 sm:p-5 mb-3 shadow-xs space-y-4">
+        <div className="flex items-center justify-between pb-1 border-b border-slate-100">
           <div>
-            <label className="text-xs font-semibold text-slate-800 block mb-1">
-              Agent Name <span className="text-rose-500">*</span>
-            </label>
-            <input
-              type="text"
-              value={agent.name}
-              onChange={(e) => handleFieldChange('name', e.target.value)}
-              placeholder="e.g. Precision HR Advisor"
-              className="w-full rounded-xl bg-slate-50 border border-slate-200 hover:border-slate-300 focus:bg-white focus:border-blue-500 focus:ring-1 focus:ring-blue-500 px-3.5 py-2 text-xs font-semibold text-slate-900 shadow-xs transition-all"
-            />
+            <h2 className="text-sm font-bold text-slate-900 tracking-tight flex items-center gap-1">
+              Overview <span className="text-rose-500">*</span>
+            </h2>
+            <p className="text-xs text-slate-500 mt-0.5">
+              Provide the Name and business description.
+            </p>
           </div>
-
-          <div className="md:col-span-2">
-            <label className="text-xs font-semibold text-slate-800 block mb-1">
-              Agent Description & Purpose <span className="text-rose-500">*</span>
-            </label>
-            <input
-              type="text"
-              value={agent.description || ''}
-              onChange={(e) => handleFieldChange('description', e.target.value)}
-              placeholder="e.g. Answers employee queries on leave policies, medical insurance, and benefits with grounded citations."
-              className="w-full rounded-xl bg-slate-50 border border-slate-200 hover:border-slate-300 focus:bg-white focus:border-blue-500 focus:ring-1 focus:ring-blue-500 px-3.5 py-2 text-xs text-slate-900 shadow-xs transition-all"
-            />
-          </div>
+          <button
+            type="button"
+            onClick={() => setOverviewOpen(!overviewOpen)}
+            className="p-1 rounded-lg text-slate-400 hover:text-slate-600 transition-colors"
+          >
+            {overviewOpen ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+          </button>
         </div>
+
+        {overviewOpen && (
+          <div className="space-y-4">
+            {/* Name Input with validation checkmark */}
+            <div>
+              <label className="text-xs font-semibold text-slate-800 block mb-1">
+                Name <span className="text-rose-500">*</span>
+              </label>
+              <div className="relative">
+                <input
+                  type="text"
+                  value={agent.name}
+                  onChange={(e) => handleFieldChange('name', e.target.value)}
+                  placeholder="New agent"
+                  className="w-full rounded-xl bg-white border border-slate-200 hover:border-slate-300 focus:bg-white focus:border-blue-500 focus:ring-1 focus:ring-blue-500 px-3.5 py-2 text-xs font-medium text-slate-900 shadow-xs transition-all pr-9"
+                />
+                {agent.name.trim().length > 0 && (
+                  <Check className="w-4 h-4 text-emerald-600 absolute right-3 top-2.5 pointer-events-none" />
+                )}
+              </div>
+            </div>
+
+            {/* Description Textarea with validation checkmark */}
+            <div>
+              <label className="text-xs font-semibold text-slate-800 block mb-1">
+                Description <span className="text-rose-500">*</span>
+              </label>
+              <div className="relative">
+                <textarea
+                  rows={2}
+                  value={agent.description || ''}
+                  onChange={(e) => handleFieldChange('description', e.target.value)}
+                  placeholder="Description"
+                  className="w-full rounded-xl bg-white border border-slate-200 hover:border-slate-300 focus:bg-white focus:border-blue-500 focus:ring-1 focus:ring-blue-500 px-3.5 py-2 text-xs text-slate-900 shadow-xs transition-all pr-9 resize-y"
+                />
+                {(agent.description || '').trim().length > 0 && (
+                  <Check className="w-4 h-4 text-emerald-600 absolute right-3 top-3 pointer-events-none" />
+                )}
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
-      {/* 3. Advance Configuration Toggle Bar matching screenshot */}
+      {/* 3. Advance Configuration Toggle Bar matching Images 2 & 3 */}
       <div className="flex items-center justify-between py-1 mb-2">
         <label className="relative inline-flex items-center cursor-pointer">
           <input
@@ -475,26 +466,34 @@ export const AgentForm: React.FC<AgentFormProps> = ({
         <button
           type="button"
           onClick={() => setAdvanceConfigOpen(!advanceConfigOpen)}
-          className="px-4 py-1.5 rounded-xl text-xs font-medium text-slate-700 bg-white border border-slate-300 hover:bg-slate-50 transition-colors shadow-xs"
+          className="px-4 py-1.5 rounded-full text-xs font-medium text-slate-700 bg-white border border-slate-300 hover:bg-slate-50 transition-colors shadow-2xs"
         >
           {advanceConfigOpen ? 'Hide Advance Configuration' : 'Get Advance Configuration'}
         </button>
       </div>
 
-      {/* 4. Amber Alert Banner matching screenshot */}
-      <div className="mb-4 p-3.5 rounded-xl bg-[#FFFBEB] border border-[#FDE68A] text-[#92400E] flex items-center justify-between shadow-xs">
-        <div className="flex items-center gap-2.5 text-xs">
-          <AlertTriangle className="w-4 h-4 text-amber-600 flex-shrink-0" />
-          <span>
-            Get the advance configurations to save your agent and enable the Quick Test.
-          </span>
+      {/* 4. Amber or Green Banner matching Images 2, 3 & 4 */}
+      {!isDraftSaved ? (
+        <div className="mb-4 p-3.5 rounded-xl bg-[#FFFBEB] border border-[#FDE68A] text-[#92400E] flex items-center justify-between shadow-xs animate-in fade-in">
+          <div className="flex items-center gap-2.5 text-xs">
+            <AlertTriangle className="w-4 h-4 text-amber-600 flex-shrink-0" />
+            <span>
+              Get the advance configurations to save your agent and enable the Quick Test.
+            </span>
+          </div>
         </div>
-        {saveMessage && (
-          <span className="text-xs font-semibold text-emerald-700 bg-emerald-50 px-2.5 py-0.5 rounded border border-emerald-200">
-            {saveMessage}
-          </span>
-        )}
-      </div>
+      ) : (
+        <div className="mb-4 p-3.5 rounded-xl bg-[#ECFDF5] border border-[#A7F3D0] text-[#065F46] flex items-center justify-between shadow-xs animate-in fade-in">
+          <div className="flex items-center gap-2.5 text-xs font-medium">
+            <div className="w-4 h-4 rounded-full border border-emerald-500 text-emerald-600 flex items-center justify-center font-bold text-[10px] flex-shrink-0">
+              ✓
+            </div>
+            <span>
+              Your Agent has been saved as draft. Now You can test your Agent using Quick Test and then do the final save.
+            </span>
+          </div>
+        </div>
+      )}
 
       {/* 5. Main Advance Configuration Card */}
       {advanceConfigOpen && (
@@ -563,27 +562,32 @@ export const AgentForm: React.FC<AgentFormProps> = ({
                       </label>
                       <div className="relative">
                         <select
-                          value={agent.provider_name || 'gemini'}
+                          value={agent.base_model_id || (models[0]?.id || '')}
                           onChange={(e) => {
-                            const provName = e.target.value;
-                            const matchingModels = models.filter(
-                              (m) => m.provider_name.toLowerCase() === provName.toLowerCase()
-                            );
-                            const firstM = matchingModels[0];
+                            const mId = Number(e.target.value);
+                            const selected = models.find((m) => m.id === mId);
                             onAgentChange({
                               ...agent,
-                              provider_name: provName,
-                              base_model_id: firstM ? firstM.id : agent.base_model_id,
-                              base_model_name: firstM ? firstM.display_name : agent.base_model_name,
+                              base_model_id: mId,
+                              base_model_name: selected?.display_name,
+                              provider_name: selected?.provider_name,
                             });
                           }}
-                          className="w-full appearance-none rounded-xl bg-white border border-slate-200 hover:border-slate-300 px-3.5 py-2.5 text-xs text-slate-900 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 shadow-xs pr-9 transition-colors font-medium"
+                          className="w-full appearance-none rounded-xl bg-white border border-slate-200 hover:border-slate-300 px-3.5 py-2.5 text-xs text-slate-900 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 shadow-xs pr-14 transition-colors font-medium"
                         >
-                          <option value="gemini">Google Gemini API</option>
-                          <option value="groq">GroqCloud</option>
-                          <option value="openrouter">OpenRouter</option>
-                          <option value="mistral">Mistral AI</option>
+                          {models.length === 0 ? (
+                            <option value="">Select Model</option>
+                          ) : (
+                            models.map((m) => (
+                              <option key={m.id} value={m.id}>
+                                {m.display_name} ({m.provider_name.toUpperCase()})
+                              </option>
+                            ))
+                          )}
                         </select>
+                        {agent.base_model_id && (
+                          <Check className="w-4 h-4 text-emerald-600 absolute right-8 top-3 pointer-events-none" />
+                        )}
                         <ChevronDown className="w-4 h-4 text-slate-400 absolute right-3 top-3 pointer-events-none" />
                       </div>
                     </div>
@@ -898,7 +902,7 @@ export const AgentForm: React.FC<AgentFormProps> = ({
                   {/* Filter and Search Bar */}
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pt-1">
                     <div className="flex items-center gap-1 overflow-x-auto pb-1 sm:pb-0 scrollbar-none">
-                      {['All', 'Documents & Files', 'Data Processing', 'Data Utilities', 'Validation & Utilities', 'Gemini AI Tools'].map((cat) => (
+                      {['All', 'Documents & Files', 'Data Processing', 'Data Utilities', 'Validation & Utilities', 'Web & Search', 'Gemini AI Tools'].map((cat) => (
                         <button
                           key={cat}
                           type="button"
@@ -964,6 +968,8 @@ export const AgentForm: React.FC<AgentFormProps> = ({
                                     {tool.icon === 'Sparkles' && <Sparkles className="w-4 h-4 text-teal-500" />}
                                     {tool.icon === 'Copy' && <Copy className="w-4 h-4 text-purple-500" />}
                                     {tool.icon === 'Cpu' && <Cpu className="w-4 h-4 text-pink-500" />}
+                                    {tool.icon === 'Search' && <Search className="w-4 h-4 text-blue-600" />}
+                                    {tool.icon === 'Globe' && <Globe className="w-4 h-4 text-emerald-600" />}
                                   </div>
 
                                   <div>
@@ -1065,7 +1071,7 @@ export const AgentForm: React.FC<AgentFormProps> = ({
                   </div>
 
                   <div className="flex items-center gap-3 pt-2">
-                    {agent.status === 'published' ? (
+                    {agent.status === 'published' && (
                       <button
                         type="button"
                         onClick={handleUnpublish}
@@ -1073,16 +1079,6 @@ export const AgentForm: React.FC<AgentFormProps> = ({
                         className="px-4 py-2 rounded-xl text-xs font-medium text-rose-700 bg-rose-50 border border-rose-200 hover:bg-rose-100 transition-colors"
                       >
                         Unpublish Agent
-                      </button>
-                    ) : (
-                      <button
-                        type="button"
-                        onClick={handlePublish}
-                        disabled={isSaving}
-                        className="flex items-center gap-1.5 px-5 py-2.5 rounded-xl text-xs font-semibold text-white bg-blue-600 hover:bg-blue-700 shadow-xs transition-all"
-                      >
-                        <Rocket className="w-3.5 h-3.5" />
-                        Publish to Gallery
                       </button>
                     )}
 
@@ -1158,59 +1154,7 @@ export const AgentForm: React.FC<AgentFormProps> = ({
         </div>
       )}
 
-      {/* 6. Bottom Sticky Actions below Advance Configuration */}
-      <div className="pt-4 pb-6 flex items-center justify-between border-t border-slate-200">
-        <div className="flex items-center gap-2 text-xs text-slate-500">
-          <span>Agent Status:</span>
-          <span className="font-semibold text-slate-800 capitalize">{agent.status}</span>
-          <span>•</span>
-          <span>Version: v{agent.current_version}</span>
-        </div>
 
-        <div className="flex items-center gap-2.5">
-          <button
-            type="button"
-            onClick={handleSaveDraft}
-            disabled={isSaving}
-            className="flex items-center gap-2 px-5 py-2 rounded-xl text-xs font-semibold text-white bg-[#0F172A] hover:bg-[#1E293B] shadow-sm transition-all"
-          >
-            <Save className="w-3.5 h-3.5" />
-            Save Draft
-          </button>
-
-          <button
-            type="button"
-            onClick={handleQuickTest}
-            disabled={isSaving}
-            className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-semibold text-blue-700 bg-blue-50 border border-blue-200 hover:bg-blue-100 transition-colors shadow-xs"
-            title="Save draft and test in Live Preview"
-          >
-            <Play className="w-3.5 h-3.5 fill-blue-600" />
-            Quick Test
-          </button>
-
-          {agent.status === 'published' ? (
-            <button
-              type="button"
-              onClick={handleUnpublish}
-              disabled={isSaving}
-              className="px-4 py-2 rounded-xl text-xs font-medium text-rose-700 bg-rose-50 border border-rose-200 hover:bg-rose-100 transition-colors"
-            >
-              Unpublish
-            </button>
-          ) : (
-            <button
-              type="button"
-              onClick={handlePublish}
-              disabled={isSaving}
-              className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-semibold text-white bg-blue-600 hover:bg-blue-700 shadow-xs transition-all"
-            >
-              <Rocket className="w-3.5 h-3.5" />
-              Publish Agent
-            </button>
-          )}
-        </div>
-      </div>
 
       {/* Configure Tool Modal */}
       {activeConfigureTool && (
