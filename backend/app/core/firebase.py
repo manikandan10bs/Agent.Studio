@@ -90,10 +90,19 @@ def init_firebase() -> Optional[firebase_admin.App]:
 def verify_firebase_token(token: str) -> Optional[Dict[str, Any]]:
     """
     Verifies a Firebase ID token.
-    1. First tries Firebase Admin SDK (if service credentials exist).
-    2. Fallbacks to Google's public JWKS cryptographic verification (works 100% credential-free).
+    1. Fast-checks token header (must be RS256 with key ID).
+    2. Tries Firebase Admin SDK (if service credentials exist).
+    3. Fallbacks to Google's public JWKS cryptographic verification.
     """
     if not token or not isinstance(token, str):
+        return None
+
+    # Only inspect tokens with RS256 signature and kid (Firebase ID tokens)
+    try:
+        header = jwt.get_unverified_header(token)
+        if header.get("alg") != "RS256" or not header.get("kid"):
+            return None
+    except Exception:
         return None
 
     from app.core.config import settings

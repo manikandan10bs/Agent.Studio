@@ -25,8 +25,18 @@ import {
   AlertTriangle,
   ShieldCheck,
   Shield,
-  Lock
+  Lock,
+  ExternalLink,
+  Loader2,
+  Sparkles
 } from 'lucide-react';
+
+const PROVIDER_KEY_URLS: Record<string, { label: string; url: string }> = {
+  gemini: { label: 'Get Free Gemini Key (AI Studio)', url: 'https://aistudio.google.com/app/apikey' },
+  groq: { label: 'Get Free Groq Key (Console)', url: 'https://console.groq.com/keys' },
+  openrouter: { label: 'Get OpenRouter Key', url: 'https://openrouter.ai/keys' },
+  mistral: { label: 'Get Mistral AI Key', url: 'https://console.mistral.ai/api-keys/' }
+};
 
 export const AdminDashboard: React.FC = () => {
   const [searchParams] = useSearchParams();
@@ -251,12 +261,19 @@ export const AdminDashboard: React.FC = () => {
         {/* TAB 1: PROVIDERS & MODELS */}
         {activeTab === 'providers' && (
           <div className="space-y-6">
-            <div className="p-4 rounded-xl bg-blue-50 border border-blue-200 text-blue-900 text-xs flex items-center justify-between shadow-xs">
-              <div className="flex items-center gap-2">
-                <ShieldCheck className="w-4 h-4 text-blue-600 flex-shrink-0" />
-                <span>
-                  <strong>Unified LLM Gateway:</strong> Add API keys for each provider below. Keys are encrypted at rest with AES-256-GCM.
-                </span>
+            <div className="p-4 rounded-xl bg-blue-50 border border-blue-200 text-blue-900 text-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-xs">
+              <div className="flex items-start gap-2.5">
+                <ShieldCheck className="w-4 h-4 text-blue-600 flex-shrink-0 mt-0.5" />
+                <div>
+                  <p className="font-bold text-slate-900">Unified LLM Gateway Configuration</p>
+                  <p className="text-slate-600 text-[11px] mt-0.5">
+                    Paste your API key into any provider card below and click <strong>Save &amp; Test</strong>. Keys are verified live and encrypted at rest with AES-256-GCM.
+                  </p>
+                </div>
+              </div>
+              <div className="text-[11px] text-blue-700 bg-white/80 px-2.5 py-1 rounded-lg border border-blue-200 font-mono flex items-center gap-1 self-start sm:self-auto flex-shrink-0">
+                <Sparkles className="w-3.5 h-3.5 text-blue-600" />
+                <span>Zero backend rebuild</span>
               </div>
             </div>
 
@@ -275,27 +292,61 @@ export const AdminDashboard: React.FC = () => {
               </div>
             )}
 
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              {providers.map((p) => (
-                <div
-                  key={p.id}
-                  className="rounded-2xl bg-white border border-slate-200 p-5 shadow-sm space-y-4"
+            {loading ? (
+              <div className="flex flex-col items-center justify-center py-16 text-blue-600 space-y-2 bg-white rounded-2xl border border-slate-200">
+                <Loader2 className="w-6 h-6 animate-spin" />
+                <span className="text-xs font-semibold text-slate-600">Loading LLM Gateway providers...</span>
+              </div>
+            ) : providers.length === 0 ? (
+              <div className="text-center py-12 bg-white rounded-2xl border border-slate-200 p-6 space-y-3">
+                <AlertTriangle className="w-8 h-8 text-amber-500 mx-auto" />
+                <h4 className="text-sm font-bold text-slate-800">No Providers Detected</h4>
+                <p className="text-xs text-slate-500 max-w-md mx-auto">
+                  Unable to load providers from the backend database. Click retry to refresh.
+                </p>
+                <button
+                  onClick={loadAllAdminData}
+                  className="px-4 py-2 rounded-xl text-xs font-semibold text-white bg-blue-600 hover:bg-blue-700"
                 >
-                  <div className="flex items-center justify-between pb-3 border-b border-slate-100">
-                    <div>
-                      <h3 className="text-base font-bold text-slate-900">{p.display_name}</h3>
-                      <p className="text-xs text-slate-500 font-mono mt-0.5">ID: {p.name}</p>
+                  Retry Loading Providers
+                </button>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                {providers.map((p) => (
+                  <div
+                    key={p.id}
+                    className="rounded-2xl bg-white border border-slate-200 p-5 shadow-sm space-y-4"
+                  >
+                    <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <h3 className="text-base font-bold text-slate-900">{p.display_name}</h3>
+                          {PROVIDER_KEY_URLS[p.name.toLowerCase()] && (
+                            <a
+                              href={PROVIDER_KEY_URLS[p.name.toLowerCase()].url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="inline-flex items-center gap-1 text-[11px] text-blue-600 hover:text-blue-700 hover:underline font-medium"
+                              title="Get API Key"
+                            >
+                              <span>Get Key</span>
+                              <ExternalLink className="w-3 h-3" />
+                            </a>
+                          )}
+                        </div>
+                        <p className="text-xs text-slate-500 font-mono mt-0.5">ID: {p.name}</p>
+                      </div>
+                      {p.is_configured ? (
+                        <span className="flex items-center gap-1 text-xs text-emerald-700 bg-emerald-100 px-2.5 py-1 rounded-full border border-emerald-200 font-semibold">
+                          <CheckCircle2 className="w-3.5 h-3.5" /> Configured
+                        </span>
+                      ) : (
+                        <span className="flex items-center gap-1 text-xs text-amber-700 bg-amber-100 px-2.5 py-1 rounded-full border border-amber-200 font-semibold">
+                          <AlertTriangle className="w-3.5 h-3.5" /> Needs Key
+                        </span>
+                      )}
                     </div>
-                    {p.is_configured ? (
-                      <span className="flex items-center gap-1 text-xs text-emerald-700 bg-emerald-100 px-2.5 py-1 rounded-full border border-emerald-200 font-semibold">
-                        <CheckCircle2 className="w-3.5 h-3.5" /> Configured
-                      </span>
-                    ) : (
-                      <span className="flex items-center gap-1 text-xs text-amber-700 bg-amber-100 px-2.5 py-1 rounded-full border border-amber-200 font-semibold">
-                        <AlertTriangle className="w-3.5 h-3.5" /> Needs Key
-                      </span>
-                    )}
-                  </div>
 
                   {/* Secret Key Input & Encryption */}
                   <div className="space-y-2">
@@ -375,6 +426,7 @@ export const AdminDashboard: React.FC = () => {
                 </div>
               ))}
             </div>
+            )}
           </div>
         )}
 
