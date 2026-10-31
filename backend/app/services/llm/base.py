@@ -16,6 +16,8 @@ class LLMResponse(BaseModel):
     usage: LLMUsage = Field(default_factory=LLMUsage)
     model: str
     latency_ms: int = 0
+    tool_calls: Optional[List[Dict[str, Any]]] = None
+    raw_parts: Optional[List[Dict[str, Any]]] = None
 
 class LLMStreamChunk(BaseModel):
     delta: str = ""

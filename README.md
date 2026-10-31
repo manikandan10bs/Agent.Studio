@@ -212,9 +212,9 @@ Navigate to `http://localhost:5173/studio`:
 
 ---
 
-## 7. Running Backend Tests
+## 7. Running Backend Tests (25 Passing)
 
-All 11 backend unit and integration tests verify authentication, ownership boundaries, AES-256-GCM credential encryption, vector retrieval, and text chunking:
+All 25 backend unit and integration tests verify authentication, ownership boundaries, AES-256-GCM credential encryption, vector retrieval, text chunking, and the 12 core tools:
 
 ```powershell
 .\venv\Scripts\Activate.ps1
@@ -235,13 +235,60 @@ tests/test_providers.py::test_mask_api_key PASSED
 tests/test_providers.py::test_unconfigured_provider_error PASSED
 tests/test_rag.py::test_chunking_logic PASSED
 tests/test_rag.py::test_local_embedding_and_similarity PASSED
+tests/test_tools.py::test_registry_contains_12_tools PASSED
+tests/test_tools.py::test_calculator_tool_operations PASSED
+tests/test_tools.py::test_datetime_tool_operations PASSED
+tests/test_tools.py::test_url_validator_and_ssrf_protection PASSED
+tests/test_tools.py::test_json_parser_tool PASSED
+tests/test_tools.py::test_csv_processor_tool PASSED
+tests/test_tools.py::test_data_cleaner_and_duplicate_finder PASSED
+tests/test_tools.py::test_chart_generator_tool PASSED
+tests/test_tools.py::test_pdf_and_docx_tools PASSED
+tests/test_tools.py::test_excel_processor_tool PASSED
+tests/test_tools.py::test_api_list_tools PASSED
+tests/test_tools.py::test_api_toggle_tool_permission PASSED
+tests/test_tools.py::test_api_test_tool_endpoint PASSED
+tests/test_tools.py::test_api_download_nonexistent_and_traversal PASSED
 
-======================= 11 passed in 1.00s =======================
+======================= 25 passed in 2.89s =======================
 ```
 
 ---
 
-## 8. Database & Production Deployment (Docker Compose)
+## 8. The 12 Core AI Agent Tools Ecosystem
+
+AGENT.STUDIO incorporates exactly **12 production-grade Python tools** organized across 5 distinct categories, with zero reliance on paid external APIs (utilizing local Python libraries and the existing Google Gemini API integration):
+
+### 1. Documents & Files
+1. **PDF Extractor** (`pdf_extractor`): Upload PDF documents, extract text page-by-page preserving page numbers and metadata with PyMuPDF (`pymupdf`), handling password-protected or empty documents gracefully.
+2. **Word Document Reader** (`docx_reader`): Read DOCX files with `python-docx`, extracting structured headings, body paragraphs, and tabular records.
+3. **Excel Processor** (`excel_processor`): Inspect XLSX workbooks with `openpyxl` & `pandas`, discover worksheets, view column schemas, filter, sort, aggregate, and generate downloadable Excel outputs.
+4. **CSV Processor** (`csv_processor`): Process CSV files with automatic delimiter/encoding detection, data previews, column filtering, and filtered file downloads.
+5. **JSON Parser** (`json_parser`): Validate JSON syntax with exact line and column error indicators, extract nested fields via dot-notation, and filter arrays of objects.
+
+### 2. Data Processing
+6. **Data Cleaner** (`data_cleaner`): Detect missing values, drop duplicate rows, normalize whitespace, standardize column headers into `lower_snake_case`, and export cleaned datasets.
+7. **Duplicate Finder** (`duplicate_finder`): Scan tabular datasets for duplicates across all or specified columns, calculate duplicate percentages, and export duplicates and unique records separately.
+
+### 3. Data Utilities
+8. **Calculator** (`calculator`): Safe Python AST mathematical evaluation (without unrestricted `eval`) supporting addition, subtraction, multiplication, division, powers, percentages (e.g. `25% of 200`), roots, and mathematical functions with division-by-zero protection.
+9. **Date & Time** (`datetime_tool`): Current time lookup, date arithmetic (add/subtract days, hours, weeks), difference calculations, and timezone conversion using Python `datetime` and `zoneinfo`.
+
+### 4. Validation & Utilities
+10. **Chart Generator** (`chart_generator`): Generate bar, line, pie, and scatter plots using `matplotlib` (`Agg` headless backend) from Excel/CSV files or JSON arrays. Returns both a direct download link and an inline base64 image preview.
+11. **URL Validator** (`url_validator`): Validate URL syntax, schemes, and hostnames. Enforces **strict SSRF protection** (blocks loopback `127.0.0.1`, `localhost`, RFC-1918 private subnets `10.0.0.0/8`, `172.16.0.0/12`, `192.168.0.0/16`, AWS/cloud metadata IPs `169.254.169.254`, and file/gopher schemes) before making live accessibility checks.
+
+### 5. Gemini AI Tools
+12. **Text Summarizer** (`text_summarizer`): Powered by the Google Gemini API to generate structured executive summaries (short, medium, detailed), key takeaways, and action items from text, uploaded PDFs, DOCX, or tabular analysis.
+
+### Creator & Admin Experience
+- **Tools Marketplace (`/tools` / `/studio?view=tools`)**: Discover all 12 tools, filter by category, search by keyword, view schema configurations, and test tools interactively with live input forms. Administrators have global toggle switches to enable/disable tools platform-wide.
+- **Agent Builder Integration (`Tools & Capabilities` Sub-tab)**: Creators can enable multiple tools for their custom agent. Disabled tools show "Disabled by Admin". Tool selections are versioned and stored with agent drafts and published snapshots.
+- **Gemini Autonomous Function Calling**: Gemini models automatically invoke enabled tools in multi-turn conversation loops (up to 3 tool calls per response), with real-time execution pills, timing telemetry, and download buttons in the chat interface.
+
+---
+
+## 9. Database & Production Deployment (Docker Compose)
 
 The project includes dual-mode database support:
 1. **Local Development (Default)**: SQLite database (`agent_studio.db`) with fast, zero-dependency 384-dimensional cosine vector search.

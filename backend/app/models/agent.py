@@ -30,6 +30,8 @@ class Agent(Base):
     capability_rag = Column(Boolean, default=True)
     capability_memory = Column(Boolean, default=True)
     capability_streaming = Column(Boolean, default=True)
+    enabled_tools = Column(Text, default="[]")  # JSON list of enabled tool IDs
+    tools_config = Column(Text, default="{}")   # JSON dictionary of tool options
 
     status = Column(String(20), default="draft")  # 'draft', 'tested', 'published', 'unpublished'
     current_version = Column(Integer, default=1)
@@ -56,6 +58,8 @@ class AgentVersion(Base):
     system_instructions = Column(Text, nullable=True)
     conversation_starters = Column(Text, nullable=True)
     capabilities = Column(Text, nullable=True)  # JSON string
+    enabled_tools = Column(Text, nullable=True, default="[]")
+    tools_config = Column(Text, nullable=True, default="{}")
     created_at = Column(DateTime(timezone=True), default=utcnow)
 
     agent = relationship("Agent", back_populates="versions")

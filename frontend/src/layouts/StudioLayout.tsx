@@ -16,7 +16,8 @@ import {
   X,
   ChevronRight,
   HelpCircle,
-  MessageSquare
+  MessageSquare,
+  Wrench
 } from 'lucide-react';
 
 interface StudioLayoutProps {
@@ -33,11 +34,13 @@ export const StudioLayout: React.FC<StudioLayoutProps> = ({ children }) => {
   const [searchQuery, setSearchQuery] = useState('');
 
   const isDashboard = location.pathname === '/studio' && location.search.includes('view=dashboard');
-  const isEditor = location.pathname === '/studio' && !location.search.includes('view=dashboard');
+  const isTools = (location.pathname === '/studio' && location.search.includes('view=tools')) || location.pathname === '/tools';
+  const isEditor = location.pathname === '/studio' && !isDashboard && !isTools;
 
   const navItems = [
     { label: 'Dashboard', icon: LayoutDashboard, path: '/studio?view=dashboard', active: isDashboard },
     { label: 'Agent', icon: Bot, path: '/studio?view=editor', active: isEditor },
+    { label: 'Tools', icon: Wrench, path: '/studio?view=tools', active: isTools },
     ...(user?.role === 'admin' ? [{ label: 'Providers & Models', icon: Cpu, path: '/admin?tab=providers', active: location.pathname === '/admin' }] : []),
     { label: 'Public Gallery', icon: Compass, path: '/explore', active: location.pathname === '/explore' },
   ];

@@ -11,6 +11,8 @@ class AgentCreate(BaseModel):
     capability_rag: bool = True
     capability_memory: bool = True
     capability_streaming: bool = True
+    enabled_tools: Optional[List[str]] = []
+    tools_config: Optional[dict] = {}
 
 class AgentUpdate(BaseModel):
     name: Optional[str] = None
@@ -21,6 +23,8 @@ class AgentUpdate(BaseModel):
     capability_rag: Optional[bool] = None
     capability_memory: Optional[bool] = None
     capability_streaming: Optional[bool] = None
+    enabled_tools: Optional[List[str]] = None
+    tools_config: Optional[dict] = None
 
 class AgentVersionOut(BaseModel):
     id: int
@@ -30,6 +34,8 @@ class AgentVersionOut(BaseModel):
     model_identifier: Optional[str]
     system_instructions: Optional[str]
     conversation_starters: Optional[str]
+    enabled_tools: Optional[str] = "[]"
+    tools_config: Optional[str] = "{}"
     created_at: datetime
 
     class Config:
@@ -49,6 +55,8 @@ class AgentOut(BaseModel):
     capability_rag: bool = True
     capability_memory: bool = True
     capability_streaming: bool = True
+    enabled_tools: List[str] = []
+    tools_config: dict = {}
     status: str = "draft"
     current_version: int = 1
     is_public: bool = False
@@ -67,6 +75,7 @@ class PublicAgentOut(BaseModel):
     conversation_starters: List[str] = []
     capability_rag: bool = True
     capability_streaming: bool = True
+    enabled_tools: List[str] = []
     created_at: datetime
 
     class Config:

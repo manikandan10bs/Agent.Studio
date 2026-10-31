@@ -7,7 +7,7 @@ from app.db.session import get_db
 from app.models.agent import Agent
 from app.models.chat import Conversation, Message
 from app.models.user import User
-from app.schemas.chat import ChatRequest, ChatResponse, MessageOut, ConversationOut, CitationOut
+from app.schemas.chat import ChatRequest, ChatResponse, MessageOut, ConversationOut, CitationOut, ToolExecutionInfo
 from app.api.deps import get_current_user
 from app.services.chat_service import handle_agent_chat, stream_agent_chat_generator
 
@@ -28,12 +28,29 @@ def serialize_message(m: Message) -> MessageOut:
         except Exception:
             citations = []
 
+    tools = []
+    if getattr(m, "tools_json", None):
+        try:
+            t_data = json.loads(m.tools_json)
+            for t in t_data:
+                tools.append(ToolExecutionInfo(
+                    tool_id=t.get("tool_id", ""),
+                    tool_name=t.get("tool_name", ""),
+                    args=t.get("args", {}),
+                    success=t.get("success", True),
+                    output_preview=t.get("output_preview"),
+                    download_url=t.get("download_url")
+                ))
+        except Exception:
+            tools = []
+
     return MessageOut(
         id=m.id,
         conversation_id=m.conversation_id,
         role=m.role,
         content=m.content,
         citations=citations,
+        tools=tools,
         latency_ms=m.latency_ms,
         token_usage=m.token_usage,
         created_at=m.created_at
@@ -76,10 +93,12 @@ async def chat_with_agent(
                 is_demo=is_demo,
                 db=db
             )
+            ser_msg = serialize_message(msg)
             return ChatResponse(
                 conversation_id=conv.id,
-                message=serialize_message(msg),
-                citations=[CitationOut(**c) for c in citations]
+                message=ser_msg,
+                citations=[CitationOut(**c) for c in citations],
+                tools=ser_msg.tools
             )
         except Exception as e:
             raise HTTPException(status_code=500, detail=str(e))

@@ -70,6 +70,8 @@ export interface Agent {
   capability_rag: boolean;
   capability_memory: boolean;
   capability_streaming: boolean;
+  enabled_tools?: string[];
+  tools_config?: Record<string, any>;
   status: 'draft' | 'tested' | 'published' | 'unpublished';
   current_version: number;
   is_public: boolean;
@@ -86,7 +88,41 @@ export interface PublicAgent {
   conversation_starters: string[];
   capability_rag: boolean;
   capability_streaming: boolean;
+  enabled_tools?: string[];
   created_at: string;
+}
+
+export interface ToolExecutionInfo {
+  tool_id: string;
+  tool_name: string;
+  parameters?: Record<string, any>;
+  success: boolean;
+  execution_time_ms: number;
+  output_preview?: string;
+  download_url?: string;
+  error?: string;
+}
+
+export interface SystemTool {
+  id: string;
+  name: string;
+  description: string;
+  category: string;
+  icon: string;
+  is_enabled: boolean;
+  config_schema?: Record<string, any>;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface ToolExecutionResult {
+  success: boolean;
+  tool_id: string;
+  data?: any;
+  error?: string;
+  execution_time_ms: number;
+  download_url?: string;
+  output_preview?: string;
 }
 
 export interface Citation {
@@ -102,6 +138,7 @@ export interface Message {
   role: 'user' | 'assistant' | 'system';
   content: string;
   citations?: Citation[];
+  tools?: ToolExecutionInfo[];
   latency_ms?: number;
   token_usage?: number;
   created_at?: string;

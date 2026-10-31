@@ -29,6 +29,7 @@ class Message(Base):
     role = Column(String(20), nullable=False)  # 'user', 'assistant', 'system'
     content = Column(Text, nullable=False)
     citations_json = Column(Text, nullable=True, default="[]")  # Grounded citations from RAG
+    tools_json = Column(Text, nullable=True, default="[]")  # Executed tools details
     latency_ms = Column(Integer, nullable=True)
     token_usage = Column(Integer, nullable=True)
     created_at = Column(DateTime(timezone=True), default=utcnow)

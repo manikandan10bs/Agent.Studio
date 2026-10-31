@@ -13,12 +13,21 @@ class CitationOut(BaseModel):
     score: float
     snippet: str
 
+class ToolExecutionInfo(BaseModel):
+    tool_id: str
+    tool_name: str
+    args: Dict[str, Any] = {}
+    success: bool = True
+    output_preview: Optional[str] = None
+    download_url: Optional[str] = None
+
 class MessageOut(BaseModel):
     id: int
     conversation_id: int
     role: str
     content: str
     citations: List[CitationOut] = []
+    tools: List[ToolExecutionInfo] = []
     latency_ms: Optional[int] = None
     token_usage: Optional[int] = None
     created_at: datetime
@@ -42,3 +51,4 @@ class ChatResponse(BaseModel):
     conversation_id: int
     message: MessageOut
     citations: List[CitationOut] = []
+    tools: List[ToolExecutionInfo] = []

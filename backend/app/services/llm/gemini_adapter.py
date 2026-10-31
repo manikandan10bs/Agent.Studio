@@ -28,20 +28,25 @@ class GeminiAdapter(BaseLLMAdapter):
         model: Optional[str] = None,
         temperature: float = 0.7,
         max_tokens: int = 2048,
+        tools: Optional[List[Dict[str, Any]]] = None,
+        raw_contents: Optional[List[Dict[str, Any]]] = None,
     ) -> LLMResponse:
         model_name = self._resolve_model(model)
         url = f"https://generativelanguage.googleapis.com/v1beta/models/{model_name}:generateContent?key={self.api_key}"
         
         # Build contents
-        contents = []
-        for m in messages:
-            role = "user" if m.role in ("user", "system") else "model"
-            contents.append({
-                "role": role,
-                "parts": [{"text": m.content}]
-            })
+        if raw_contents is not None:
+            contents = raw_contents
+        else:
+            contents = []
+            for m in messages:
+                role = "user" if m.role in ("user", "system") else "model"
+                contents.append({
+                    "role": role,
+                    "parts": [{"text": m.content}]
+                })
 
-        payload = {
+        payload: Dict[str, Any] = {
             "contents": contents,
             "generationConfig": {
                 "temperature": temperature,
@@ -52,6 +57,9 @@ class GeminiAdapter(BaseLLMAdapter):
             payload["system_instruction"] = {
                 "parts": [{"text": system_prompt}]
             }
+
+        if tools and len(tools) > 0:
+            payload["tools"] = [{"function_declarations": tools}]
 
         start_time = time.time()
         async with httpx.AsyncClient(timeout=60.0) as client:
@@ -69,9 +77,15 @@ class GeminiAdapter(BaseLLMAdapter):
             data = res.json()
             candidates = data.get("candidates", [])
             content_text = ""
+            tool_calls = []
+            parts = []
             if candidates:
                 parts = candidates[0].get("content", {}).get("parts", [])
-                content_text = "".join(p.get("text", "") for p in parts)
+                for p in parts:
+                    if "text" in p:
+                        content_text += p.get("text", "")
+                    if "functionCall" in p:
+                        tool_calls.append(p["functionCall"])
 
             meta = data.get("usageMetadata", {})
             usage = LLMUsage(
@@ -84,7 +98,9 @@ class GeminiAdapter(BaseLLMAdapter):
                 content=content_text,
                 usage=usage,
                 model=model_name,
-                latency_ms=latency_ms
+                latency_ms=latency_ms,
+                tool_calls=tool_calls if tool_calls else None,
+                raw_parts=parts
             )
 
     async def generate_stream(

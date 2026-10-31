@@ -89,28 +89,138 @@ async def handle_agent_chat(
     # 5. Get LLM adapter
     adapter, model_identifier = get_adapter_for_model(agent.base_model.model_identifier, db)
 
-    # 6. Generate response
+    # 6. Resolve Agent's Enabled Tools with Admin Permissions Check
+    agent_tools = []
+    if getattr(agent, "enabled_tools", None):
+        try:
+            agent_tools = json.loads(agent.enabled_tools)
+        except Exception:
+            agent_tools = []
+
+    from app.models.tool import SystemTool, ToolExecutionLog
+    from app.services.tools import registry
+    from app.services.llm.gemini_adapter import GeminiAdapter
+
+    admin_enabled = set(
+        st.id for st in db.query(SystemTool.id).filter(
+            SystemTool.id.in_(agent_tools),
+            SystemTool.is_enabled == True
+        ).all()
+    )
+    active_tool_ids = [t for t in agent_tools if t in admin_enabled]
+    tool_declarations = registry.to_gemini_declarations(active_tool_ids) if active_tool_ids else []
+
+    # 7. Generate response (with multi-step tool execution support for Gemini)
     start_time = time.time()
+    executed_tools = []
+
     try:
-        response: LLMResponse = await adapter.generate(
-            messages=llm_messages,
-            system_prompt=system_prompt,
-            model=model_identifier,
-        )
+        if isinstance(adapter, GeminiAdapter) and tool_declarations:
+            # Build initial contents
+            raw_contents = []
+            for m in llm_messages:
+                raw_contents.append({
+                    "role": "user" if m.role in ("user", "system") else "model",
+                    "parts": [{"text": m.content}]
+                })
+
+            response = None
+            # Multi-turn tool execution loop (max 3 calls)
+            for _ in range(3):
+                response = await adapter.generate(
+                    messages=llm_messages,
+                    system_prompt=system_prompt,
+                    model=model_identifier,
+                    tools=tool_declarations,
+                    raw_contents=raw_contents
+                )
+
+                if not response.tool_calls:
+                    break
+
+                for call in response.tool_calls:
+                    call_name = call.get("name")
+                    call_args = call.get("args") or {}
+
+                    if call_name not in active_tool_ids:
+                        tool_res_content = {"error": f"Tool '{call_name}' is not enabled for this agent."}
+                        tool_success = False
+                        tool_preview = None
+                        tool_dl = None
+                    else:
+                        exec_context = {
+                            "db": db,
+                            "agent_id": agent.id,
+                            "user_id": user_id,
+                            "conversation_id": conversation.id
+                        }
+                        tool_exec = await registry.execute_tool(call_name, call_args, context=exec_context)
+                        tool_success = tool_exec.success
+                        tool_res_content = tool_exec.data if tool_success else {"error": tool_exec.error}
+                        tool_preview = tool_exec.output_preview
+                        tool_dl = tool_exec.download_url
+
+                        # Log tool execution to database
+                        tool_log = ToolExecutionLog(
+                            tool_id=call_name,
+                            agent_id=agent.id,
+                            user_id=user_id,
+                            conversation_id=conversation.id,
+                            input_params_json=json.dumps(call_args, default=str)[:1000],
+                            output_summary_json=json.dumps(tool_res_content, default=str)[:1000] if tool_success else None,
+                            execution_time_ms=tool_exec.execution_time_ms,
+                            status="success" if tool_success else "failed",
+                            error_message=tool_exec.error
+                        )
+                        db.add(tool_log)
+                        db.commit()
+
+                    tool_obj = registry.get(call_name)
+                    executed_tools.append({
+                        "tool_id": call_name,
+                        "tool_name": tool_obj.name if tool_obj else call_name,
+                        "args": call_args,
+                        "success": tool_success,
+                        "output_preview": tool_preview,
+                        "download_url": tool_dl
+                    })
+
+                    # Append function call and function response to conversation
+                    raw_contents.append({
+                        "role": "model",
+                        "parts": [{"functionCall": {"name": call_name, "args": call_args}}]
+                    })
+                    raw_contents.append({
+                        "role": "function",
+                        "parts": [{
+                            "functionResponse": {
+                                "name": call_name,
+                                "response": {"name": call_name, "content": tool_res_content}
+                            }
+                        }]
+                    })
+        else:
+            response = await adapter.generate(
+                messages=llm_messages,
+                system_prompt=system_prompt,
+                model=model_identifier,
+            )
+
         latency_ms = response.latency_ms or int((time.time() - start_time) * 1000)
 
-        # 7. Save assistant message
+        # 8. Save assistant message with citations and executed tools
         asst_msg_record = Message(
             conversation_id=conversation.id,
             role="assistant",
-            content=response.content,
+            content=response.content or "Tool operation executed successfully.",
             citations_json=json.dumps(citations),
+            tools_json=json.dumps(executed_tools),
             latency_ms=latency_ms,
             token_usage=response.usage.total_tokens
         )
         db.add(asst_msg_record)
 
-        # 8. Log usage
+        # 9. Log usage
         usage_event = UsageEvent(
             user_id=user_id,
             agent_id=agent.id,
@@ -231,22 +341,135 @@ async def stream_agent_chat_generator(
         yield f"data: {json.dumps({'error': str(e)})}\n\n"
         return
 
+    # Tools resolution
+    agent_tools = []
+    if getattr(agent, "enabled_tools", None):
+        try:
+            agent_tools = json.loads(agent.enabled_tools)
+        except Exception:
+            agent_tools = []
+
+    from app.models.tool import SystemTool, ToolExecutionLog
+    from app.services.tools import registry
+    from app.services.llm.gemini_adapter import GeminiAdapter
+
+    admin_enabled = set(
+        st.id for st in db.query(SystemTool.id).filter(
+            SystemTool.id.in_(agent_tools),
+            SystemTool.is_enabled == True
+        ).all()
+    )
+    active_tool_ids = [t for t in agent_tools if t in admin_enabled]
+    tool_declarations = registry.to_gemini_declarations(active_tool_ids) if active_tool_ids else []
+
     full_response_text = ""
+    executed_tools = []
     start_time = time.time()
+
     try:
-        async for chunk in adapter.generate_stream(
-            messages=llm_messages,
-            system_prompt=system_prompt,
-            model=model_identifier
-        ):
-            if chunk.error:
-                yield f"data: {json.dumps({'error': chunk.error})}\n\n"
-                return
-            if chunk.delta:
-                full_response_text += chunk.delta
-                yield f"data: {json.dumps({'delta': chunk.delta, 'type': 'delta'})}\n\n"
-            if chunk.is_done:
-                break
+        if isinstance(adapter, GeminiAdapter) and tool_declarations:
+            # Multi-turn tool execution
+            raw_contents = []
+            for m in llm_messages:
+                raw_contents.append({
+                    "role": "user" if m.role in ("user", "system") else "model",
+                    "parts": [{"text": m.content}]
+                })
+
+            response = None
+            for _ in range(3):
+                response = await adapter.generate(
+                    messages=llm_messages,
+                    system_prompt=system_prompt,
+                    model=model_identifier,
+                    tools=tool_declarations,
+                    raw_contents=raw_contents
+                )
+
+                if not response.tool_calls:
+                    break
+
+                for call in response.tool_calls:
+                    call_name = call.get("name")
+                    call_args = call.get("args") or {}
+
+                    if call_name not in active_tool_ids:
+                        tool_res_content = {"error": f"Tool '{call_name}' is not enabled for this agent."}
+                        tool_success = False
+                        tool_preview = None
+                        tool_dl = None
+                    else:
+                        exec_context = {
+                            "db": db,
+                            "agent_id": agent.id,
+                            "user_id": user_id,
+                            "conversation_id": conversation.id
+                        }
+                        tool_exec = await registry.execute_tool(call_name, call_args, context=exec_context)
+                        tool_success = tool_exec.success
+                        tool_res_content = tool_exec.data if tool_success else {"error": tool_exec.error}
+                        tool_preview = tool_exec.output_preview
+                        tool_dl = tool_exec.download_url
+
+                        # Log tool execution to database
+                        tool_log = ToolExecutionLog(
+                            tool_id=call_name,
+                            agent_id=agent.id,
+                            user_id=user_id,
+                            conversation_id=conversation.id,
+                            input_params_json=json.dumps(call_args, default=str)[:1000],
+                            output_summary_json=json.dumps(tool_res_content, default=str)[:1000] if tool_success else None,
+                            execution_time_ms=tool_exec.execution_time_ms,
+                            status="success" if tool_success else "failed",
+                            error_message=tool_exec.error
+                        )
+                        db.add(tool_log)
+                        db.commit()
+
+                    tool_obj = registry.get(call_name)
+                    executed_tools.append({
+                        "tool_id": call_name,
+                        "tool_name": tool_obj.name if tool_obj else call_name,
+                        "args": call_args,
+                        "success": tool_success,
+                        "output_preview": tool_preview,
+                        "download_url": tool_dl
+                    })
+
+                    raw_contents.append({
+                        "role": "model",
+                        "parts": [{"functionCall": {"name": call_name, "args": call_args}}]
+                    })
+                    raw_contents.append({
+                        "role": "function",
+                        "parts": [{
+                            "functionResponse": {
+                                "name": call_name,
+                                "response": {"name": call_name, "content": tool_res_content}
+                            }
+                        }]
+                    })
+
+            if executed_tools:
+                yield f"data: {json.dumps({'tools': executed_tools, 'type': 'tools'})}\n\n"
+
+            full_response_text = response.content if response else ""
+            if full_response_text:
+                yield f"data: {json.dumps({'delta': full_response_text, 'type': 'delta'})}\n\n"
+        else:
+            async for chunk in adapter.generate_stream(
+                messages=llm_messages,
+                system_prompt=system_prompt,
+                model=model_identifier
+            ):
+                if chunk.error:
+                    yield f"data: {json.dumps({'error': chunk.error})}\n\n"
+                    return
+                if chunk.delta:
+                    full_response_text += chunk.delta
+                    yield f"data: {json.dumps({'delta': chunk.delta, 'type': 'delta'})}\n\n"
+                if chunk.is_done:
+                    break
 
         latency_ms = int((time.time() - start_time) * 1000)
 
@@ -254,8 +477,9 @@ async def stream_agent_chat_generator(
         asst_msg_record = Message(
             conversation_id=conversation.id,
             role="assistant",
-            content=full_response_text,
+            content=full_response_text or "Operation completed.",
             citations_json=json.dumps(citations),
+            tools_json=json.dumps(executed_tools),
             latency_ms=latency_ms
         )
         db.add(asst_msg_record)

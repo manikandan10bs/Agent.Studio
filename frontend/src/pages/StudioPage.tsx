@@ -3,6 +3,7 @@ import { useSearchParams, useNavigate } from 'react-router-dom';
 import { StudioLayout } from '../layouts/StudioLayout';
 import { AgentForm } from '../features/agents/AgentForm';
 import { LivePreviewChat } from '../features/chat/LivePreviewChat';
+import { ToolsMarketplace } from '../features/tools/ToolsMarketplace';
 import { Agent } from '../types';
 import { api } from '../services/api';
 import {
@@ -122,6 +123,15 @@ export const StudioPage: React.FC = () => {
 
   const publishedCount = agents.filter((a) => a.status === 'published').length;
   const testedCount = agents.filter((a) => a.status === 'tested').length;
+
+  // 0. TOOLS VIEW: Tools Marketplace & Sandbox Testing
+  if (currentView === 'tools') {
+    return (
+      <StudioLayout>
+        <ToolsMarketplace />
+      </StudioLayout>
+    );
+  }
 
   // 1. DASHBOARD VIEW: Shows all created models and agents
   if (currentView === 'dashboard') {

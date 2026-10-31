@@ -53,6 +53,22 @@ DEFAULT_PROVIDERS = [
 ]
 
 def init_db(db: Session) -> None:
+    # 0. Ensure schema migration for SQLite if updating existing DB
+    if db.bind and db.bind.dialect.name == "sqlite":
+        from sqlalchemy import text
+        for col_def in [
+            "ALTER TABLE agents ADD COLUMN enabled_tools TEXT DEFAULT '[]'",
+            "ALTER TABLE agents ADD COLUMN tools_config TEXT DEFAULT '{}'",
+            "ALTER TABLE agent_versions ADD COLUMN enabled_tools TEXT DEFAULT '[]'",
+            "ALTER TABLE agent_versions ADD COLUMN tools_config TEXT DEFAULT '{}'",
+            "ALTER TABLE messages ADD COLUMN tools_json TEXT DEFAULT '[]'"
+        ]:
+            try:
+                db.execute(text(col_def))
+                db.commit()
+            except Exception:
+                db.rollback()
+
     # 1. Create Default Admin if not exists
     admin = db.query(User).filter(User.email == settings.DEFAULT_ADMIN_EMAIL).first()
     if not admin:
@@ -150,6 +166,12 @@ def init_db(db: Session) -> None:
             capability_rag=True,
             capability_memory=True,
             capability_streaming=True,
+            enabled_tools=json.dumps([
+                "pdf_extractor", "docx_reader", "excel_processor", "csv_processor",
+                "json_parser", "data_cleaner", "duplicate_finder", "calculator",
+                "datetime_tool", "chart_generator", "url_validator", "text_summarizer"
+            ]),
+            tools_config=json.dumps({}),
             status="tested",
             current_version=1,
             is_public=True
@@ -170,7 +192,9 @@ def init_db(db: Session) -> None:
                 "rag": True,
                 "memory": True,
                 "streaming": True
-            })
+            }),
+            enabled_tools=demo_agent.enabled_tools,
+            tools_config=demo_agent.tools_config
         )
         db.add(agent_v1)
 
@@ -184,3 +208,28 @@ def init_db(db: Session) -> None:
         db.flush()
         demo_agent.knowledge_bases.append(kb)
         db.commit()
+
+    # 4. Seed the 12 Core System Tools
+    from app.models.tool import SystemTool
+    from app.services.tools import registry
+    for tool in registry.list_tools():
+        existing_tool = db.query(SystemTool).filter(SystemTool.id == tool.id).first()
+        if not existing_tool:
+            st = SystemTool(
+                id=tool.id,
+                name=tool.name,
+                description=tool.description,
+                category=tool.category,
+                icon=tool.icon,
+                is_enabled=True,
+                config_schema=json.dumps(tool.input_schema)
+            )
+            db.add(st)
+        else:
+            # Sync description and category while preserving admin's is_enabled switch
+            existing_tool.name = tool.name
+            existing_tool.description = tool.description
+            existing_tool.category = tool.category
+            existing_tool.icon = tool.icon
+            existing_tool.config_schema = json.dumps(tool.input_schema)
+    db.commit()

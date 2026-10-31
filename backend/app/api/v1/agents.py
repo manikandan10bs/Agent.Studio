@@ -26,6 +26,20 @@ def serialize_agent(agent: Agent) -> AgentOut:
         except Exception:
             starters = []
 
+    tools_list = []
+    if getattr(agent, "enabled_tools", None):
+        try:
+            tools_list = json.loads(agent.enabled_tools)
+        except Exception:
+            tools_list = []
+
+    tools_cfg = {}
+    if getattr(agent, "tools_config", None):
+        try:
+            tools_cfg = json.loads(agent.tools_config)
+        except Exception:
+            tools_cfg = {}
+
     return AgentOut(
         id=agent.id,
         creator_id=agent.creator_id,
@@ -40,6 +54,8 @@ def serialize_agent(agent: Agent) -> AgentOut:
         capability_rag=agent.capability_rag,
         capability_memory=agent.capability_memory,
         capability_streaming=agent.capability_streaming,
+        enabled_tools=tools_list,
+        tools_config=tools_cfg,
         status=agent.status,
         current_version=agent.current_version,
         is_public=agent.is_public,
@@ -91,6 +107,8 @@ def create_agent(
         capability_rag=agent_in.capability_rag,
         capability_memory=agent_in.capability_memory,
         capability_streaming=agent_in.capability_streaming,
+        enabled_tools=json.dumps(agent_in.enabled_tools or []),
+        tools_config=json.dumps(agent_in.tools_config or {}),
         status="draft",
         current_version=1,
         is_public=False
@@ -121,7 +139,9 @@ def create_agent(
             "rag": agent.capability_rag,
             "memory": agent.capability_memory,
             "streaming": agent.capability_streaming
-        })
+        }),
+        enabled_tools=agent.enabled_tools,
+        tools_config=agent.tools_config
     )
     db.add(v1)
     db.commit()
@@ -184,6 +204,10 @@ def update_agent(
         agent.capability_memory = agent_update.capability_memory
     if agent_update.capability_streaming is not None:
         agent.capability_streaming = agent_update.capability_streaming
+    if agent_update.enabled_tools is not None:
+        agent.enabled_tools = json.dumps(agent_update.enabled_tools)
+    if agent_update.tools_config is not None:
+        agent.tools_config = json.dumps(agent_update.tools_config)
 
     db.commit()
     db.refresh(agent)
@@ -251,7 +275,9 @@ def publish_agent(
             "rag": agent.capability_rag,
             "memory": agent.capability_memory,
             "streaming": agent.capability_streaming
-        })
+        }),
+        enabled_tools=agent.enabled_tools,
+        tools_config=agent.tools_config
     )
     db.add(version_snapshot)
 

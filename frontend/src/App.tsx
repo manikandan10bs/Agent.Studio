@@ -72,6 +72,15 @@ export function App() {
             }
           />
 
+          <Route
+            path="/tools"
+            element={
+              <ProtectedRoute>
+                <Navigate to="/studio?view=tools" replace />
+              </ProtectedRoute>
+            }
+          />
+
           {/* Protected Admin Portal */}
           <Route
             path="/admin"

@@ -319,4 +319,47 @@ export const api = {
     const res = await fetch(`${API_BASE}/admin/audit-logs`, { headers: getHeaders() });
     return handleResponse<AuditLog[]>(res);
   },
+
+  // --- 12 Core System Tools API ---
+  async getTools(category?: string, search?: string): Promise<import('../types').SystemTool[]> {
+    const params = new URLSearchParams();
+    if (category && category !== 'All') params.append('category', category);
+    if (search && search.trim()) params.append('search', search.trim());
+    const query = params.toString() ? `?${params.toString()}` : '';
+    const res = await fetch(`${API_BASE}/tools${query}`, { headers: getHeaders() });
+    return handleResponse<import('../types').SystemTool[]>(res);
+  },
+
+  async toggleTool(toolId: string, is_enabled: boolean): Promise<import('../types').SystemTool> {
+    const res = await fetch(`${API_BASE}/tools/${toolId}/toggle`, {
+      method: 'PATCH',
+      headers: getHeaders(),
+      body: JSON.stringify({ is_enabled }),
+    });
+    return handleResponse<import('../types').SystemTool>(res);
+  },
+
+  async testTool(toolId: string, parameters: Record<string, any>): Promise<import('../types').ToolExecutionResult> {
+    const res = await fetch(`${API_BASE}/tools/${toolId}/test`, {
+      method: 'POST',
+      headers: getHeaders(),
+      body: JSON.stringify({ tool_id: toolId, parameters }),
+    });
+    return handleResponse<import('../types').ToolExecutionResult>(res);
+  },
+
+  async uploadToolTestFile(file: File): Promise<{ filename: string; original_filename: string; file_size: number; file_path: string }> {
+    const formData = new FormData();
+    formData.append('file', file);
+    const token = localStorage.getItem('agent_studio_token');
+    const headers: Record<string, string> = {};
+    if (token) headers['Authorization'] = `Bearer ${token}`;
+
+    const res = await fetch(`${API_BASE}/tools/upload-test-file`, {
+      method: 'POST',
+      headers,
+      body: formData,
+    });
+    return handleResponse<{ filename: string; original_filename: string; file_size: number; file_path: string }>(res);
+  },
 };

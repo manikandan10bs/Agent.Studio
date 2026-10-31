@@ -16,7 +16,9 @@ import {
   ChevronUp,
   AlertTriangle,
   Loader2,
-  Bot
+  Bot,
+  Wrench,
+  Download
 } from 'lucide-react';
 
 interface LivePreviewChatProps {
@@ -334,6 +336,42 @@ export const LivePreviewChat: React.FC<LivePreviewChatProps> = ({
                     </div>
                   ) : (
                     <p className="whitespace-pre-wrap">{msg.content}</p>
+                  )}
+
+                  {/* Executed Tools Badges */}
+                  {msg.tools && msg.tools.length > 0 && (
+                    <div className="mt-2.5 pt-2 border-t border-slate-100 space-y-1.5">
+                      <div className="flex items-center gap-1.5 text-[10px] font-bold text-slate-500 uppercase tracking-wider">
+                        <Wrench className="w-3 h-3 text-blue-500" />
+                        <span>Executed Tools ({msg.tools.length})</span>
+                      </div>
+                      <div className="flex flex-wrap gap-1.5">
+                        {msg.tools.map((t, tIdx) => (
+                          <div
+                            key={tIdx}
+                            className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[10px] font-mono border ${
+                              t.success
+                                ? 'bg-emerald-50/70 border-emerald-200 text-emerald-800'
+                                : 'bg-rose-50/70 border-rose-200 text-rose-800'
+                            }`}
+                          >
+                            <span className="font-semibold">{t.tool_name || t.tool_id}</span>
+                            <span className="text-[9px] text-slate-400">({t.execution_time_ms}ms)</span>
+                            {t.download_url && (
+                              <a
+                                href={t.download_url}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="ml-1 text-blue-600 hover:text-blue-800 font-bold underline inline-flex items-center gap-0.5"
+                              >
+                                <Download className="w-2.5 h-2.5" />
+                                <span>Output</span>
+                              </a>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
                   )}
 
                   {/* Grounded RAG Citations */}
