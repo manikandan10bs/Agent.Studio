@@ -1,7 +1,8 @@
+from __future__ import annotations
 import time
 import json
 import httpx
-from typing import List, Optional, AsyncGenerator, Tuple
+from typing import List, Optional, AsyncGenerator, Tuple, Dict, Any
 from app.services.llm.base import BaseLLMAdapter, LLMMessage, LLMResponse, LLMUsage, LLMStreamChunk
 
 class GeminiAdapter(BaseLLMAdapter):
