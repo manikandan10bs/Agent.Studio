@@ -277,14 +277,14 @@ export const LivePreviewChat: React.FC<LivePreviewChatProps> = ({
   return (
     <div className="flex flex-col h-full rounded-2xl bg-white border border-slate-200 shadow-sm overflow-hidden relative">
       {/* Header */}
-      <div className="flex items-center justify-between px-4 py-3 border-b border-slate-200 bg-white flex-wrap gap-2">
+      <div className="flex items-center justify-between px-4 py-3 border-b border-slate-200/90 bg-white/95 backdrop-blur-xs flex-wrap gap-2">
         <div className="flex items-center gap-2">
           <span className="text-sm font-bold text-slate-900 tracking-tight">
-            Quick test
+            Quick Playground
           </span>
           {agent.capability_memory ? (
             <span className="text-[10px] px-2 py-0.5 rounded-full font-semibold border bg-emerald-50 text-emerald-700 border-emerald-200">
-              Memory Active
+              Memory On
             </span>
           ) : (
             <span className="text-[10px] px-2 py-0.5 rounded-full font-semibold border bg-slate-100 text-slate-500 border-slate-200">
@@ -292,7 +292,7 @@ export const LivePreviewChat: React.FC<LivePreviewChatProps> = ({
             </span>
           )}
           <span className="text-[11px] text-slate-400 hidden sm:inline">
-            • {agent.base_model_name || 'Gemini 2.5 Flash'}
+            • {agent.base_model_name || 'Autonomous Agent'}
           </span>
         </div>
 
@@ -304,7 +304,7 @@ export const LivePreviewChat: React.FC<LivePreviewChatProps> = ({
               onClick={() => setShowHistory(!showHistory)}
               className={`flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold transition-all shadow-2xs ${
                 showHistory
-                  ? 'bg-blue-600 text-white'
+                  ? 'bg-indigo-600 text-white'
                   : 'bg-white text-slate-700 border border-slate-200 hover:bg-slate-100'
               }`}
               title="View Conversation Memory & Chat History"
@@ -348,7 +348,7 @@ export const LivePreviewChat: React.FC<LivePreviewChatProps> = ({
               type="button"
               onClick={onClose}
               className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors"
-              title="Close Quick Test"
+              title="Close Quick Playground"
             >
               <X className="w-4 h-4" />
             </button>
@@ -433,14 +433,14 @@ export const LivePreviewChat: React.FC<LivePreviewChatProps> = ({
       <div className="flex-1 overflow-y-auto p-4 sm:p-5 space-y-4 bg-white">
         {messages.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-full text-center max-w-md mx-auto my-auto py-8 px-4 select-none animate-in fade-in">
-            <div className="w-10 h-10 rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center mb-4">
-              <Sparkles className="w-6 h-6 text-blue-500 fill-blue-500" />
+            <div className="w-11 h-11 rounded-2xl bg-gradient-to-tr from-indigo-500 to-violet-500 text-white flex items-center justify-center mb-4 shadow-md shadow-indigo-500/20">
+              <Sparkles className="w-5 h-5 fill-white" />
             </div>
             <h2 className="text-xl font-bold text-slate-900 tracking-tight">
-              Welcome to AGENT.STUDIO
+              Agent.Studio Playground
             </h2>
             <p className="text-xs text-slate-500 mt-2 leading-relaxed max-w-sm">
-              Build, automate, and collaborate with intelligent AI agents workflows — all from a single conversation.
+              Interact directly with {agent.name || 'this agent'}. Verify instructions, function calling, and RAG document grounding in real-time.
             </p>
 
             {(agent.conversation_starters || []).length > 0 && (
@@ -453,9 +453,9 @@ export const LivePreviewChat: React.FC<LivePreviewChatProps> = ({
                     <button
                       key={i}
                       onClick={() => handleSendMessage(starter)}
-                      className="text-left text-xs p-2.5 rounded-xl bg-slate-50 hover:bg-blue-50 border border-slate-200 hover:border-blue-300 text-slate-700 hover:text-blue-900 transition-all shadow-2xs"
+                      className="text-left text-xs p-2.5 rounded-xl bg-slate-50 hover:bg-indigo-50/60 border border-slate-200 hover:border-indigo-300 text-slate-700 hover:text-indigo-900 transition-all shadow-2xs"
                     >
-                      <span className="text-blue-600 font-bold mr-1.5">›</span>
+                      <span className="text-indigo-600 font-bold mr-1.5">›</span>
                       {starter}
                     </button>
                   ))}
@@ -473,7 +473,7 @@ export const LivePreviewChat: React.FC<LivePreviewChatProps> = ({
             >
               <div className="flex items-start gap-2.5 max-w-[88%] sm:max-w-[82%]">
                 {msg.role === 'assistant' && (
-                  <div className="w-7 h-7 rounded-xl bg-gradient-to-br from-blue-600 to-indigo-600 flex items-center justify-center flex-shrink-0 mt-0.5 shadow-xs">
+                  <div className="w-7 h-7 rounded-xl bg-gradient-to-tr from-indigo-600 via-indigo-500 to-violet-600 flex items-center justify-center flex-shrink-0 mt-0.5 shadow-xs">
                     <Bot className="w-3.5 h-3.5 text-white" />
                   </div>
                 )}
@@ -481,8 +481,8 @@ export const LivePreviewChat: React.FC<LivePreviewChatProps> = ({
                 <div
                   className={`rounded-2xl px-4 py-2.5 text-xs sm:text-sm leading-relaxed ${
                     msg.role === 'user'
-                      ? 'bg-[#0F172A] text-white rounded-tr-sm shadow-sm'
-                      : 'bg-white border border-slate-200 text-slate-800 rounded-tl-sm shadow-sm'
+                      ? 'bg-gradient-to-r from-slate-900 to-indigo-950 text-white rounded-tr-sm shadow-sm'
+                      : 'bg-white border border-slate-200/90 text-slate-800 rounded-tl-sm shadow-sm'
                   }`}
                 >
                   {msg.role === 'assistant' ? (
@@ -499,7 +499,7 @@ export const LivePreviewChat: React.FC<LivePreviewChatProps> = ({
                   {msg.tools && msg.tools.length > 0 && (
                     <div className="mt-2.5 pt-2 border-t border-slate-100 space-y-1.5">
                       <div className="flex items-center gap-1.5 text-[10px] font-bold text-slate-500 uppercase tracking-wider">
-                        <Wrench className="w-3 h-3 text-blue-500" />
+                        <Wrench className="w-3 h-3 text-indigo-500" />
                         <span>Executed Tools ({msg.tools.length})</span>
                       </div>
                       <div className="flex flex-wrap gap-1.5">
@@ -519,7 +519,7 @@ export const LivePreviewChat: React.FC<LivePreviewChatProps> = ({
                                 href={t.download_url}
                                 target="_blank"
                                 rel="noreferrer"
-                                className="ml-1 text-blue-600 hover:text-blue-800 font-bold underline inline-flex items-center gap-0.5"
+                                className="ml-1 text-indigo-600 hover:text-indigo-800 font-bold underline inline-flex items-center gap-0.5"
                               >
                                 <Download className="w-2.5 h-2.5" />
                                 <span>Output</span>
@@ -537,7 +537,7 @@ export const LivePreviewChat: React.FC<LivePreviewChatProps> = ({
                       <button
                         type="button"
                         onClick={() => toggleCitation(idx)}
-                        className="flex items-center gap-1.5 text-[10px] font-semibold text-blue-600 hover:text-blue-700"
+                        className="flex items-center gap-1.5 text-[10px] font-semibold text-indigo-600 hover:text-indigo-700"
                       >
                         <BookOpen className="w-3 h-3" />
                         <span>{msg.citations.length} Grounded Sources</span>
@@ -553,13 +553,13 @@ export const LivePreviewChat: React.FC<LivePreviewChatProps> = ({
                           {msg.citations.map((cit, cIdx) => (
                             <div
                               key={cIdx}
-                              className="rounded-lg bg-blue-50/70 border border-blue-100 p-2 text-[10px] text-slate-600"
+                              className="rounded-lg bg-indigo-50/50 border border-indigo-100 p-2 text-[10px] text-slate-600"
                             >
-                              <div className="flex items-center justify-between text-blue-900 font-semibold">
+                              <div className="flex items-center justify-between text-indigo-950 font-semibold">
                                 <span>
                                   📄 {cit.source} (Page {cit.page})
                                 </span>
-                                <span className="text-[9px] text-blue-600">
+                                <span className="text-[9px] text-indigo-600">
                                   Score: {cit.score}
                                 </span>
                               </div>
@@ -602,14 +602,14 @@ export const LivePreviewChat: React.FC<LivePreviewChatProps> = ({
         <div ref={messagesEndRef} />
       </div>
 
-      {/* Composer at Bottom matching Image 4 */}
+      {/* Composer Console */}
       <div className="p-3 border-t border-slate-100 bg-white">
         <form
           onSubmit={(e) => {
             e.preventDefault();
             handleSendMessage();
           }}
-          className="rounded-2xl bg-white border border-slate-200/90 shadow-sm focus-within:border-blue-400 p-2.5 transition-all flex flex-col justify-between"
+          className="rounded-2xl bg-white border border-slate-200/90 shadow-sm focus-within:border-indigo-400 focus-within:ring-2 focus-within:ring-indigo-500/10 p-2.5 transition-all flex flex-col justify-between"
         >
           <textarea
             ref={textareaRef}
@@ -626,7 +626,7 @@ export const LivePreviewChat: React.FC<LivePreviewChatProps> = ({
                 handleSendMessage();
               }
             }}
-            placeholder="Type a message"
+            placeholder={`Message ${agent.name || 'Agent'}...`}
             disabled={isGenerating}
             className="w-full bg-transparent text-xs sm:text-sm text-slate-900 placeholder-slate-400 focus:outline-none resize-none px-1.5 py-1 leading-relaxed min-h-[36px]"
           />
@@ -634,35 +634,18 @@ export const LivePreviewChat: React.FC<LivePreviewChatProps> = ({
           <div className="flex items-center justify-between pt-1 mt-1 border-t border-slate-100/60">
             {/* Left controls: Plus button + Agent pill */}
             <div className="flex items-center gap-2">
-              <button
-                type="button"
-                className="p-1.5 rounded-lg text-slate-500 hover:text-slate-900 hover:bg-slate-100 transition-colors"
-                title="Add attachment"
-              >
-                <Plus className="w-4 h-4" />
-              </button>
-
-              <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-slate-100/80 hover:bg-slate-200 text-xs font-semibold text-slate-700 transition-colors cursor-pointer">
-                <Bot className="w-3.5 h-3.5 text-blue-600" />
+              <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-slate-100 hover:bg-slate-200 text-xs font-semibold text-slate-700 transition-colors">
+                <Bot className="w-3.5 h-3.5 text-indigo-600" />
                 <span className="truncate max-w-[120px]">{agent.name || 'Agent'}</span>
-                <ChevronDown className="w-3 h-3 text-slate-400" />
               </div>
             </div>
 
             {/* Right controls: Mic + Send */}
             <div className="flex items-center gap-2">
               <button
-                type="button"
-                className="p-2 rounded-full text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors"
-                title="Voice input"
-              >
-                <Mic className="w-4 h-4" />
-              </button>
-
-              <button
                 type="submit"
                 disabled={isGenerating || !inputValue.trim()}
-                className="p-2 rounded-xl bg-[#0B1320] hover:bg-slate-800 text-white disabled:opacity-30 disabled:cursor-not-allowed transition-all shadow-sm flex items-center justify-center flex-shrink-0"
+                className="p-2 rounded-xl bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-500 hover:to-violet-500 text-white disabled:opacity-30 disabled:cursor-not-allowed transition-all shadow-sm flex items-center justify-center flex-shrink-0"
                 title="Send message"
               >
                 <Send className="w-3.5 h-3.5" />

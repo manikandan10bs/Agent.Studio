@@ -45,7 +45,7 @@ export const StudioPage: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
 
-  // Agent Platform / List state (Image 1)
+  // Fleet view search & filters
   const [activeTab, setActiveTab] = useState<'created' | 'shared'>('created');
   const [draftSearchQuery, setDraftSearchQuery] = useState('');
 
@@ -92,7 +92,7 @@ export const StudioPage: React.FC = () => {
     return `${day}, ${time}`;
   };
 
-  // Start fresh agent creation without persisting to DB yet (Image 2)
+  // Start fresh agent draft in memory
   const handleStartNewDraft = () => {
     const blankAgent: Agent = {
       id: 0,
@@ -419,233 +419,254 @@ export const StudioPage: React.FC = () => {
     );
   }
 
-  // 2. AGENT SECTION: Shows Agent List (Image 1) or Agent Editor (Images 2, 3, 4)
-  const draftAgents = agents.filter((a) => a.status !== 'published');
-  const filteredDrafts = draftAgents.filter((ag) => {
-    if (!draftSearchQuery) return true;
-    const q = draftSearchQuery.toLowerCase();
-    return ag.name.toLowerCase().includes(q) || (ag.description && ag.description.toLowerCase().includes(q));
+  // 2. AGENT SECTION: Shows Agent Studio Fleet Workspace or Agent Studio Editor
+  const [fleetFilter, setFleetFilter] = useState<'all' | 'published' | 'draft'>('all');
+  const filteredAgentsList = agents.filter((ag) => {
+    const matchesSearch =
+      ag.name.toLowerCase().includes(draftSearchQuery.toLowerCase()) ||
+      (ag.description && ag.description.toLowerCase().includes(draftSearchQuery.toLowerCase())) ||
+      (ag.base_model_name && ag.base_model_name.toLowerCase().includes(draftSearchQuery.toLowerCase()));
+    const matchesFilter =
+      fleetFilter === 'all' ||
+      (fleetFilter === 'published' && ag.status === 'published') ||
+      (fleetFilter === 'draft' && ag.status !== 'published');
+    return matchesSearch && matchesFilter;
   });
 
-  // 2A. LIST VIEW (Image 1): When no agent is actively being edited
+  const publishedAgentsCount = agents.filter((a) => a.status === 'published').length;
+  const draftAgentsCount = agents.filter((a) => a.status !== 'published').length;
+
+  // 2A. FLEET WORKSPACE VIEW: When no agent is actively being edited
   if (!editingAgent) {
     return (
       <StudioLayout>
-        <div className="flex flex-col h-full w-full overflow-y-auto pr-1">
-          {/* Top Bar matching Image 1 */}
-          <div className="flex items-center justify-between gap-3 pb-3 border-b border-slate-200/80 mb-3 flex-wrap">
-            <div className="flex items-center gap-2">
-              <div className="relative">
-                <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-2.5" />
-                <input
-                  type="text"
-                  placeholder="Search"
-                  value={draftSearchQuery}
-                  onChange={(e) => setDraftSearchQuery(e.target.value)}
-                  className="w-48 sm:w-64 rounded-xl bg-white border border-slate-200 pl-8 pr-3 py-1.5 text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:border-blue-500 shadow-2xs"
-                />
+        <div className="flex flex-col h-full w-full overflow-y-auto pr-1 space-y-6">
+          {/* Top Hero Header */}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-slate-200">
+            <div>
+              <div className="flex items-center gap-2 mb-1">
+                <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-indigo-50 border border-indigo-200 text-indigo-700">
+                  Agent Platform
+                </span>
+                <span className="text-[10px] font-medium text-slate-500">
+                  {agents.length} active agent{agents.length === 1 ? '' : 's'}
+                </span>
               </div>
+              <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight">
+                Agent Studio Fleet
+              </h1>
+              <p className="text-xs sm:text-sm text-slate-500 mt-0.5">
+                Design, ground with vector document intelligence, and deploy autonomous agents.
+              </p>
+            </div>
+
+            <div className="flex items-center gap-2.5">
               <button
                 type="button"
                 onClick={loadAgents}
-                title="Refresh list"
-                className="p-2 rounded-xl bg-white border border-slate-200 text-slate-600 hover:text-slate-900 hover:bg-slate-50 transition-colors shadow-2xs"
+                title="Refresh fleet"
+                className="p-2.5 rounded-xl bg-white border border-slate-200 hover:border-slate-300 text-slate-600 hover:text-slate-900 transition-colors shadow-2xs"
               >
-                <RotateCcw className="w-3.5 h-3.5" />
+                <RotateCcw className="w-4 h-4" />
               </button>
-            </div>
 
-            <div className="flex items-center gap-3">
               <button
                 type="button"
                 onClick={handleStartNewDraft}
-                className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-semibold text-white bg-[#1E40AF] hover:bg-blue-800 shadow-xs transition-all"
+                className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs font-bold text-white bg-gradient-to-r from-indigo-600 via-violet-600 to-indigo-700 hover:from-indigo-500 hover:to-violet-500 shadow-md shadow-indigo-500/20 transition-all hover:scale-[1.01]"
               >
-                <span>Create an Agent</span>
-                <Plus className="w-4 h-4" />
-              </button>
-
-              <div className="w-8 h-8 rounded-full bg-blue-600 text-white flex items-center justify-center font-bold text-xs shadow-xs">
                 <Sparkles className="w-4 h-4" />
-              </div>
+                <span>Create New Agent</span>
+              </button>
             </div>
           </div>
 
-          {/* Sub-header Tabs matching Image 1 */}
-          <div className="flex items-center gap-6 border-b border-slate-200 mb-5">
-            <button
-              type="button"
-              onClick={() => setActiveTab('created')}
-              className={`pb-2.5 text-xs font-bold transition-all relative ${
-                activeTab === 'created'
-                  ? 'text-blue-600 border-b-2 border-blue-600'
-                  : 'text-slate-500 hover:text-slate-800'
-              }`}
-            >
-              Created by me
-            </button>
-            <button
-              type="button"
-              onClick={() => setActiveTab('shared')}
-              className={`pb-2.5 text-xs font-semibold transition-all relative ${
-                activeTab === 'shared'
-                  ? 'text-blue-600 border-b-2 border-blue-600'
-                  : 'text-slate-500 hover:text-slate-800'
-              }`}
-            >
-              Shared with me
-            </button>
+          {/* Search & Filter Bar */}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div className="flex items-center gap-1.5 p-1 rounded-xl bg-slate-100 border border-slate-200 text-xs font-semibold">
+              <button
+                type="button"
+                onClick={() => setFleetFilter('all')}
+                className={`px-3 py-1.5 rounded-lg transition-all ${
+                  fleetFilter === 'all'
+                    ? 'bg-white text-slate-900 shadow-xs'
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                All Agents ({agents.length})
+              </button>
+              <button
+                type="button"
+                onClick={() => setFleetFilter('published')}
+                className={`px-3 py-1.5 rounded-lg transition-all ${
+                  fleetFilter === 'published'
+                    ? 'bg-white text-emerald-700 shadow-xs'
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                Live &amp; Published ({publishedAgentsCount})
+              </button>
+              <button
+                type="button"
+                onClick={() => setFleetFilter('draft')}
+                className={`px-3 py-1.5 rounded-lg transition-all ${
+                  fleetFilter === 'draft'
+                    ? 'bg-white text-indigo-700 shadow-xs'
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                In Development ({draftAgentsCount})
+              </button>
+            </div>
+
+            <div className="relative min-w-[240px]">
+              <Search className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" />
+              <input
+                type="text"
+                placeholder="Search by name, model, specialty..."
+                value={draftSearchQuery}
+                onChange={(e) => setDraftSearchQuery(e.target.value)}
+                className="w-full rounded-xl bg-white border border-slate-200 hover:border-slate-300 pl-9 pr-3 py-2 text-xs text-slate-900 placeholder-slate-400 focus:outline-none focus:border-indigo-500 shadow-xs transition-colors"
+              />
+            </div>
           </div>
 
-          {/* Cards Grid matching Image 1 */}
-          {activeTab === 'shared' ? (
-            <div className="flex flex-col items-center justify-center p-12 bg-white rounded-2xl border border-slate-200 text-center my-auto">
-              <div className="w-12 h-12 rounded-2xl bg-slate-50 text-slate-400 flex items-center justify-center mb-3">
-                <Bot className="w-6 h-6" />
+          {/* Cards Grid */}
+          {filteredAgentsList.length === 0 ? (
+            <div className="flex flex-col items-center justify-center p-14 bg-white rounded-2xl border border-slate-200 text-center my-6 shadow-xs">
+              <div className="w-14 h-14 rounded-2xl bg-indigo-50 border border-indigo-100 text-indigo-600 flex items-center justify-center mb-3.5 shadow-inner">
+                <Bot className="w-7 h-7" />
               </div>
-              <h3 className="text-sm font-bold text-slate-900">No Shared Agents</h3>
-              <p className="text-xs text-slate-500 mt-1 max-w-sm">
-                Agents shared with you across workspaces will appear here.
-              </p>
-            </div>
-          ) : filteredDrafts.length === 0 ? (
-            <div className="flex flex-col items-center justify-center p-12 bg-white rounded-2xl border border-slate-200 text-center my-auto">
-              <div className="w-12 h-12 rounded-2xl bg-amber-50 text-amber-600 flex items-center justify-center mb-3">
-                <Bot className="w-6 h-6" />
-              </div>
-              <h3 className="text-sm font-bold text-slate-900">No Draft Agents</h3>
-              <p className="text-xs text-slate-500 mt-1 max-w-sm mb-4">
-                Click "Create an Agent +" above to build and configure a new AI agent.
+              <h3 className="text-base font-bold text-slate-900">No agents match your filter</h3>
+              <p className="text-xs text-slate-500 mt-1 max-w-sm mb-5 leading-relaxed">
+                Create a new autonomous agent powered by Gemini, Groq, OpenRouter, or Mistral with document RAG.
               </p>
               <button
                 type="button"
                 onClick={handleStartNewDraft}
-                className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-semibold text-white bg-[#1E40AF] hover:bg-blue-800 shadow-xs"
+                className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs font-bold text-white bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-500 hover:to-violet-500 shadow-md shadow-indigo-500/20"
               >
-                <span>Create an Agent</span>
                 <Plus className="w-4 h-4" />
+                <span>Build First Agent</span>
               </button>
             </div>
           ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-              {filteredDrafts.map((ag) => (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 pb-12">
+              {filteredAgentsList.map((ag) => (
                 <div
                   key={ag.id}
-                  className="rounded-2xl border border-slate-200/90 bg-white p-4 hover:shadow-md transition-all relative flex flex-col justify-between group"
+                  className="rounded-2xl border border-slate-200 bg-white hover:border-indigo-400 p-5 hover:shadow-lg hover:-translate-y-0.5 transition-all relative flex flex-col justify-between group"
                 >
                   <div>
-                    {/* Card Top Row: Checkbox top-right, Icon + Name + Tags top-left */}
-                    <div className="flex items-start justify-between gap-2 mb-2">
-                      <div className="flex items-center gap-2.5 min-w-0 flex-1">
-                        <div className="w-9 h-9 rounded-xl bg-[#0B1320] text-purple-400 flex items-center justify-center flex-shrink-0 shadow-2xs">
-                          <Bot className="w-5 h-5 text-indigo-400" />
+                    {/* Card Top Row: Avatar + Status + Menu */}
+                    <div className="flex items-start justify-between gap-2 mb-3">
+                      <div className="flex items-center gap-2.5">
+                        <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-500 via-purple-500 to-cyan-500 p-0.5 shadow-xs">
+                          <div className="w-full h-full rounded-[10px] bg-slate-900 flex items-center justify-center text-white">
+                            <Bot className="w-5 h-5 text-indigo-300" />
+                          </div>
                         </div>
-                        <div className="min-w-0 flex-1">
-                          <div className="flex items-center gap-1.5 flex-wrap">
-                            <h3 className="text-sm font-bold text-slate-900 truncate max-w-[130px]">{ag.name}</h3>
-                            <span className="text-[10px] px-1.5 py-0.5 rounded font-semibold bg-emerald-500 text-white leading-none">
-                              Agent
+                        <div>
+                          <div className="flex items-center gap-1.5">
+                            <span
+                              className={`inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full font-bold uppercase tracking-wide ${
+                                ag.status === 'published'
+                                  ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                                  : 'bg-indigo-50 text-indigo-700 border border-indigo-200'
+                              }`}
+                            >
+                              {ag.status === 'published' ? (
+                                <>
+                                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                                  Live
+                                </>
+                              ) : (
+                                'Draft'
+                              )}
                             </span>
-                            <span className="text-[10px] px-1.5 py-0.5 rounded font-semibold bg-amber-400 text-white leading-none">
-                              Draft
+                            <span className="text-[10px] text-slate-400 font-mono">
+                              v{ag.current_version || 1}
                             </span>
                           </div>
                         </div>
                       </div>
-                      <div className="w-4 h-4 rounded border border-slate-300 flex-shrink-0 hover:border-slate-400 cursor-pointer" />
+
+                      <div className="flex items-center gap-1">
+                        <button
+                          type="button"
+                          onClick={() => handleDuplicateAgent(ag)}
+                          title="Duplicate Agent"
+                          className="p-1.5 hover:text-slate-700 hover:bg-slate-100 rounded-lg text-slate-400 transition-colors"
+                        >
+                          <Copy className="w-3.5 h-3.5" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setAgentToDelete(ag);
+                            setDeleteConfirmText('');
+                          }}
+                          title="Delete Agent"
+                          className="p-1.5 hover:text-rose-600 hover:bg-rose-50 rounded-lg text-slate-400 transition-colors"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
                     </div>
 
-                    {/* Description */}
-                    <p className="text-xs text-slate-500 line-clamp-2 min-h-[32px] mt-1 leading-relaxed">
-                      {ag.description || 'No description provided.'}
+                    {/* Agent Name & Description */}
+                    <h3 className="text-sm font-bold text-slate-900 group-hover:text-indigo-600 transition-colors tracking-tight">
+                      {ag.name}
+                    </h3>
+                    <p className="text-xs text-slate-500 mt-1 line-clamp-2 leading-relaxed">
+                      {ag.description || 'Autonomous assistant built with Agent.Studio.'}
                     </p>
 
-                    {/* Owner & Last Modified */}
-                    <div className="grid grid-cols-2 gap-2 text-[11px] mt-3 pt-2 text-slate-400">
-                      <div>
-                        <span className="block text-slate-400 text-[10px]">Owner:</span>
-                        <span className="font-medium text-slate-700 truncate block">
-                          {user?.full_name || 'Manikandan N'}
+                    {/* Model & Capabilities Pills */}
+                    <div className="mt-4 pt-3 border-t border-slate-100 flex items-center gap-1.5 flex-wrap">
+                      <span className="text-[10px] px-2 py-0.5 rounded-md bg-slate-100 text-slate-700 font-mono font-medium">
+                        {ag.base_model_name || 'Standard Model'}
+                      </span>
+                      {ag.capability_rag && (
+                        <span className="text-[10px] px-2 py-0.5 rounded-md bg-blue-50 text-blue-700 border border-blue-100 font-semibold">
+                          RAG
                         </span>
-                      </div>
-                      <div>
-                        <span className="block text-slate-400 text-[10px]">Last modified:</span>
-                        <span className="font-medium text-slate-700 truncate block">
-                          {formatAgentDate(ag.updated_at)}
+                      )}
+                      {ag.capability_streaming && (
+                        <span className="text-[10px] px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-700 border border-emerald-100 font-semibold">
+                          Stream
                         </span>
-                      </div>
+                      )}
                     </div>
                   </div>
 
                   {/* Bottom Action Footer */}
-                  <div className="border-t border-slate-100 pt-2.5 mt-3 flex items-center justify-between text-slate-400">
-                    <div className="flex items-center gap-2">
-                      <button
-                        type="button"
-                        title="Agent Details"
-                        className="p-1 hover:text-slate-700 hover:bg-slate-100 rounded transition-colors"
-                      >
-                        <Info className="w-3.5 h-3.5" />
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setEditingAgent(ag);
-                          setIsDraftSaved(true);
-                          setIsQuickTestOpen(false);
-                        }}
-                        title="Edit Agent"
-                        className="p-1 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors"
-                      >
-                        <Edit3 className="w-3.5 h-3.5" />
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setAgentToDelete(ag);
-                          setDeleteConfirmText('');
-                        }}
-                        title="Delete Agent"
-                        className="p-1 hover:text-rose-600 hover:bg-rose-50 rounded transition-colors"
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => handleDuplicateAgent(ag)}
-                        title="Duplicate Agent"
-                        className="p-1 hover:text-slate-700 hover:bg-slate-100 rounded transition-colors"
-                      >
-                        <Copy className="w-3.5 h-3.5" />
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setEditingAgent(ag);
-                          setIsDraftSaved(true);
-                          setIsQuickTestOpen(true);
-                        }}
-                        title="Quick Test"
-                        className="p-1 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors"
-                      >
-                        <Play className="w-3.5 h-3.5" />
-                      </button>
-                      <button
-                        type="button"
-                        onClick={handleStartNewDraft}
-                        title="Add new Agent"
-                        className="p-1 hover:text-slate-700 hover:bg-slate-100 rounded transition-colors"
-                      >
-                        <Plus className="w-3.5 h-3.5" />
-                      </button>
-                    </div>
+                  <div className="border-t border-slate-100 pt-3 mt-4 flex items-center justify-between gap-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setEditingAgent(ag);
+                        setIsDraftSaved(ag.status !== 'published');
+                        setIsQuickTestOpen(true);
+                      }}
+                      className="flex-1 flex items-center justify-center gap-1.5 py-1.5 px-3 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold transition-colors"
+                    >
+                      <Play className="w-3.5 h-3.5 text-indigo-600" />
+                      <span>Test Chat</span>
+                    </button>
 
                     <button
                       type="button"
-                      className="p-1 hover:text-slate-700 hover:bg-slate-100 rounded transition-colors"
-                      title="More options"
+                      onClick={() => {
+                        setEditingAgent(ag);
+                        setIsDraftSaved(ag.status !== 'published');
+                        setIsQuickTestOpen(false);
+                      }}
+                      className="flex-1 flex items-center justify-center gap-1.5 py-1.5 px-3 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold transition-colors shadow-xs"
                     >
-                      <MoreVertical className="w-3.5 h-3.5" />
+                      <Sliders className="w-3.5 h-3.5" />
+                      <span>Configure</span>
                     </button>
                   </div>
                 </div>
@@ -658,7 +679,7 @@ export const StudioPage: React.FC = () => {
     );
   }
 
-  // 2B. EDITOR VIEW (Images 2, 3, 4): Creation / Edit Form + Conditional Quick Test
+  // 2B. AGENT STUDIO WORKSPACE: Creation / Edit Canvas + Integrated Quick Playground
   return (
     <StudioLayout>
       <div className="flex flex-col w-full h-full min-h-0 min-w-0">
@@ -694,7 +715,7 @@ export const StudioPage: React.FC = () => {
             />
           </div>
 
-          {/* Right Side Quick Test Chatbot (Image 4): Only renders when isQuickTestOpen is true */}
+          {/* Right Side Quick Playground: Only renders when isQuickTestOpen is true */}
           {isQuickTestOpen && (
             <div className="h-full flex flex-col overflow-hidden w-full lg:w-[42%] animate-in slide-in-from-right-3 duration-200">
               <LivePreviewChat

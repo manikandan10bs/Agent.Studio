@@ -2,7 +2,7 @@ from datetime import datetime, timezone, timedelta
 from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, status, Request
 from sqlalchemy.orm import Session
-from sqlalchemy import func
+from sqlalchemy import func, cast, Integer
 from app.db.session import get_db
 from app.core.config import settings
 from app.core.security import (
@@ -67,7 +67,7 @@ def get_usage_statistics(
             func.count(UsageEvent.id).label("requests"),
             func.sum(UsageEvent.total_tokens).label("tokens"),
             func.avg(UsageEvent.latency_ms).label("latency"),
-            func.sum(func.cast(UsageEvent.is_error, func.Integer if db.bind.dialect.name == "sqlite" else None)).label("errors")
+            func.sum(cast(UsageEvent.is_error, Integer)).label("errors")
         )
         .group_by(UsageEvent.provider_name, UsageEvent.model_identifier)
         .all()

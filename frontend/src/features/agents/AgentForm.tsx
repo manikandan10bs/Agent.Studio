@@ -39,13 +39,15 @@ import {
   ArrowRight,
   Wrench,
   ShieldCheck,
-  MessageCircle,
-  Lock,
   Search,
   Globe,
-  Download,
   Settings,
-  Bot
+  Bot,
+  Zap,
+  Sliders,
+  Database,
+  Terminal,
+  Activity
 } from 'lucide-react';
 
 interface AgentFormProps {
@@ -75,9 +77,7 @@ export const AgentForm: React.FC<AgentFormProps> = ({
   onBackToList,
   onAgentPublished,
 }) => {
-  const [overviewOpen, setOverviewOpen] = useState(true);
-  const [activeSubTab, setActiveSubTab] = useState<'model' | 'system' | 'skills' | 'mcp' | 'tools' | 'runtime' | 'prompts'>('model');
-  const [advanceConfigOpen, setAdvanceConfigOpen] = useState(true);
+  const [activeTab, setActiveTab] = useState<'model' | 'instructions' | 'knowledge' | 'tools' | 'runtime'>('model');
   const [thinkingLevel, setThinkingLevel] = useState('Not supported');
 
   const [models, setModels] = useState<Model[]>([]);
@@ -90,7 +90,7 @@ export const AgentForm: React.FC<AgentFormProps> = ({
   const [showShareModal, setShowShareModal] = useState(false);
   const [saveMessage, setSaveMessage] = useState<string | null>(null);
 
-  // 12 Core Tools State
+  // Tools state
   const [availableTools, setAvailableTools] = useState<SystemTool[]>([]);
   const [toolsSearch, setToolsSearch] = useState('');
   const [toolsCategory, setToolsCategory] = useState('All');
@@ -100,7 +100,7 @@ export const AgentForm: React.FC<AgentFormProps> = ({
   const [isExecutingTest, setIsExecutingTest] = useState(false);
   const [testResult, setTestResult] = useState<ToolExecutionResult | null>(null);
 
-  // Load enabled models, providers status, documents, and 12 core tools
+  // Load models, providers, documents, and tools
   const loadData = async () => {
     try {
       const [modelsList, providersList, docsList, toolsList] = await Promise.all([
@@ -114,7 +114,6 @@ export const AgentForm: React.FC<AgentFormProps> = ({
       setDocuments(docsList);
       setAvailableTools(toolsList);
 
-      // Auto-select first model if agent doesn't have one assigned
       if (!agent.base_model_id && modelsList.length > 0) {
         onAgentChange({
           ...agent,
@@ -124,7 +123,7 @@ export const AgentForm: React.FC<AgentFormProps> = ({
         });
       }
     } catch (err: any) {
-      console.error('Failed to load models or docs:', err);
+      console.error('Failed to load agent workspace data:', err);
     }
   };
 
@@ -198,7 +197,7 @@ export const AgentForm: React.FC<AgentFormProps> = ({
 
   const handleSaveDraft = async () => {
     if (!agent.name.trim()) {
-      alert('Please enter an Agent Name before saving draft.');
+      alert('Please provide an Agent Name before saving draft.');
       return;
     }
     setIsSaving(true);
@@ -210,8 +209,8 @@ export const AgentForm: React.FC<AgentFormProps> = ({
           name: agent.name.trim(),
           description: agent.description?.trim() || '',
           base_model_id: agent.base_model_id,
-          system_instructions: agent.system_instructions || 'You are a helpful and accurate precision AI assistant.',
-          conversation_starters: agent.conversation_starters || ['What can you help me with?'],
+          system_instructions: agent.system_instructions || 'You are an autonomous intelligence assistant built on Agent.Studio.',
+          conversation_starters: agent.conversation_starters || ['What can you assist me with today?'],
           capability_rag: agent.capability_rag ?? true,
           capability_memory: agent.capability_memory ?? true,
           capability_streaming: agent.capability_streaming ?? true,
@@ -234,7 +233,7 @@ export const AgentForm: React.FC<AgentFormProps> = ({
       }
       onAgentChange(savedAgent);
       setIsDraftSaved(true);
-      setSaveMessage('Your Agent has been saved as draft. Now You can test your Agent using Quick Test and then do the final save.');
+      setSaveMessage('Agent draft synchronized. Test in the Quick Playground or Publish live.');
     } catch (err: any) {
       alert(`Save failed: ${err.message}`);
     } finally {
@@ -244,7 +243,7 @@ export const AgentForm: React.FC<AgentFormProps> = ({
 
   const handleFinalSave = async () => {
     if (!agent.name.trim()) {
-      alert('Please enter an Agent Name.');
+      alert('Please specify an Agent Name.');
       return;
     }
     setIsSaving(true);
@@ -255,8 +254,8 @@ export const AgentForm: React.FC<AgentFormProps> = ({
           name: agent.name.trim(),
           description: agent.description?.trim() || '',
           base_model_id: agent.base_model_id,
-          system_instructions: agent.system_instructions || 'You are a helpful and accurate precision AI assistant.',
-          conversation_starters: agent.conversation_starters || ['What can you help me with?'],
+          system_instructions: agent.system_instructions || 'You are an autonomous intelligence assistant built on Agent.Studio.',
+          conversation_starters: agent.conversation_starters || ['What can you assist me with today?'],
           capability_rag: agent.capability_rag ?? true,
           capability_memory: agent.capability_memory ?? true,
           capability_streaming: agent.capability_streaming ?? true,
@@ -300,870 +299,823 @@ export const AgentForm: React.FC<AgentFormProps> = ({
     }
   };
 
-  // Currently selected provider
   const currentProvider = providers.find(
     (p) => p.name.toLowerCase() === (agent.provider_name || 'gemini').toLowerCase()
   );
 
-  // Filter models for selected provider
   const selectedProviderModels = models.filter(
     (m) => m.provider_name.toLowerCase() === (agent.provider_name || 'gemini').toLowerCase()
   );
 
-  // 7 Sub-tabs matching screenshot
-  const subTabs = [
-    { id: 'model', label: 'Model', icon: Cpu, badge: 'info' },
-    { id: 'system', label: 'System Message', icon: FileText, badge: 'info' },
-    { id: 'skills', label: 'Skills', icon: Menu, dot: true },
-    { id: 'mcp', label: 'MCP', icon: Layers, dot: true },
-    { id: 'tools', label: 'Tools & Capabilities', icon: Wrench, dot: true },
-    { id: 'runtime', label: 'Runtime', icon: ShieldCheck, dot: true },
-    { id: 'prompts', label: 'Sample Prompts', icon: MessageSquare, dot: true },
+  const tabs = [
+    { id: 'model', label: 'Model & Engine', icon: Cpu },
+    { id: 'instructions', label: 'Persona & Instructions', icon: Sparkles },
+    { id: 'knowledge', label: 'Knowledge Base', icon: BookOpen, count: documents.length },
+    { id: 'tools', label: 'Capabilities & Tools', icon: Wrench, count: (agent.enabled_tools || []).length },
+    { id: 'runtime', label: 'Runtime & Governance', icon: ShieldCheck },
   ];
 
   return (
-    <div className="flex-1 h-full min-h-0 overflow-y-auto overflow-x-hidden pr-2 pb-24 space-y-4 scroll-smooth">
-      {/* Top Header matching Images 2 & 3 */}
-      <div className="flex items-center justify-between pb-3.5 mb-2 border-b border-slate-200 flex-shrink-0">
-        <div className="flex items-center gap-2.5">
-          <h1 className="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight">
-            Create an Agent
-          </h1>
-        </div>
-
-        {/* Top Right Action Buttons matching Images 2 & 3 */}
-        <div className="flex items-center gap-2.5">
-          {/* If draft has been saved (Image 3), show Final Save */}
-          {isDraftSaved && (
-            <button
-              type="button"
-              onClick={handleFinalSave}
-              disabled={isSaving}
-              className="flex items-center justify-center px-5 py-2 rounded-xl text-xs font-semibold text-white bg-[#0F172A] hover:bg-[#1E293B] shadow-sm transition-all"
-            >
-              {isSaving ? <Loader2 className="w-3.5 h-3.5 animate-spin mr-1.5" /> : null}
-              Final Save
-            </button>
-          )}
-
-          {/* Save Draft is always available */}
-          <button
-            type="button"
-            onClick={handleSaveDraft}
-            disabled={isSaving}
-            className="flex items-center justify-center px-5 py-2 rounded-xl text-xs font-semibold text-white bg-[#0F172A] hover:bg-[#1E293B] shadow-sm transition-all"
-          >
-            {isSaving && !isDraftSaved ? <Loader2 className="w-3.5 h-3.5 animate-spin mr-1.5" /> : null}
-            Save Draft
-          </button>
-
-          {/* Quick Test button appears after draft is saved (Image 3) */}
-          {isDraftSaved && (
-            <button
-              type="button"
-              onClick={handleQuickTestClick}
-              disabled={isSaving}
-              className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-semibold text-white bg-[#1E40AF] hover:bg-blue-800 transition-colors shadow-xs"
-              title="Test agent in Quick Test panel"
-            >
-              <span className="font-bold">›</span>
-              Quick Test
-            </button>
-          )}
-
-          {/* Back to list button */}
+    <div className="flex-1 h-full min-h-0 overflow-y-auto overflow-x-hidden pr-2 pb-24 space-y-5 scroll-smooth">
+      {/* 1. STUDIO COMMAND BAR */}
+      <div className="sticky top-0 z-20 -mx-1 px-4 py-3 bg-white/90 backdrop-blur-md border-b border-slate-200/80 rounded-2xl shadow-xs flex flex-wrap items-center justify-between gap-3">
+        <div className="flex items-center gap-3 min-w-0">
           {onBackToList && (
             <button
               type="button"
               onClick={onBackToList}
-              className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-medium text-slate-700 bg-white border border-slate-300 hover:bg-slate-50 transition-colors shadow-xs"
+              className="p-1.5 rounded-xl text-slate-500 hover:text-slate-900 hover:bg-slate-100 transition-all"
+              title="Return to Agent Fleet"
             >
-              <ArrowLeft className="w-3.5 h-3.5" />
-              Back to list
+              <ArrowLeft className="w-4 h-4" />
             </button>
           )}
-        </div>
-      </div>
 
-      {/* 2. Overview Section matching Images 2, 3 & 4 */}
-      <div className="rounded-2xl bg-white border border-slate-200 p-4 sm:p-5 mb-3 shadow-xs space-y-4">
-        <div className="flex items-center justify-between pb-1 border-b border-slate-100">
-          <div>
-            <h2 className="text-sm font-bold text-slate-900 tracking-tight flex items-center gap-1">
-              Overview <span className="text-rose-500">*</span>
-            </h2>
-            <p className="text-xs text-slate-500 mt-0.5">
-              Provide the Name and business description.
-            </p>
+          <div className="flex items-center gap-2.5 min-w-0">
+            <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-indigo-600 via-indigo-500 to-violet-600 flex items-center justify-center text-white font-bold text-xs shadow-xs flex-shrink-0">
+              {agent.name.charAt(0).toUpperCase() || 'A'}
+            </div>
+            <div className="min-w-0">
+              <div className="flex items-center gap-2">
+                <span className="text-sm sm:text-base font-bold text-slate-900 tracking-tight truncate">
+                  {agent.name || 'Untitled Agent'}
+                </span>
+                {agent.status === 'published' ? (
+                  <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                    Live v{agent.current_version}
+                  </span>
+                ) : isDraftSaved ? (
+                  <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-violet-50 text-violet-700 border border-violet-200">
+                    <span className="w-1.5 h-1.5 rounded-full bg-violet-500" />
+                    Draft Saved
+                  </span>
+                ) : (
+                  <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-slate-100 text-slate-600 border border-slate-200">
+                    <span className="w-1.5 h-1.5 rounded-full bg-slate-400" />
+                    In Development
+                  </span>
+                )}
+              </div>
+            </div>
           </div>
+        </div>
+
+        {/* Command Action Suite */}
+        <div className="flex items-center gap-2">
+          {agent.id && (
+            <button
+              type="button"
+              onClick={() => setShowShareModal(true)}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium text-slate-600 hover:text-slate-900 hover:bg-slate-100 border border-slate-200 transition-colors"
+            >
+              <Share2 className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">Share</span>
+            </button>
+          )}
+
           <button
             type="button"
-            onClick={() => setOverviewOpen(!overviewOpen)}
-            className="p-1 rounded-lg text-slate-400 hover:text-slate-600 transition-colors"
+            onClick={handleQuickTestClick}
+            disabled={isSaving}
+            className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-semibold transition-all shadow-xs ${
+              isQuickTestOpen
+                ? 'bg-indigo-600 text-white shadow-indigo-200'
+                : 'bg-white text-indigo-700 border border-indigo-200 hover:bg-indigo-50/60'
+            }`}
           >
-            {overviewOpen ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+            <Play className={`w-3.5 h-3.5 ${isQuickTestOpen ? 'fill-white' : 'fill-indigo-600'}`} />
+            <span>Playground</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={handleSaveDraft}
+            disabled={isSaving}
+            className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-medium text-slate-700 bg-white border border-slate-200 hover:bg-slate-50 transition-colors shadow-2xs"
+          >
+            {isSaving && !isDraftSaved ? (
+              <Loader2 className="w-3.5 h-3.5 animate-spin" />
+            ) : (
+              <Save className="w-3.5 h-3.5 text-slate-500" />
+            )}
+            <span>Save Draft</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={handleFinalSave}
+            disabled={isSaving}
+            className="flex items-center gap-1.5 px-4 py-1.5 rounded-xl text-xs font-semibold text-white bg-gradient-to-r from-indigo-600 via-indigo-600 to-violet-600 hover:from-indigo-500 hover:to-violet-500 shadow-sm shadow-indigo-600/20 transition-all"
+          >
+            {isSaving ? (
+              <Loader2 className="w-3.5 h-3.5 animate-spin" />
+            ) : (
+              <Rocket className="w-3.5 h-3.5" />
+            )}
+            <span>{agent.status === 'published' ? 'Update Live Agent' : 'Publish Agent'}</span>
           </button>
         </div>
-
-        {overviewOpen && (
-          <div className="space-y-4">
-            {/* Name Input with validation checkmark */}
-            <div>
-              <label className="text-xs font-semibold text-slate-800 block mb-1">
-                Name <span className="text-rose-500">*</span>
-              </label>
-              <div className="relative">
-                <input
-                  type="text"
-                  value={agent.name}
-                  onChange={(e) => handleFieldChange('name', e.target.value)}
-                  placeholder="New agent"
-                  className="w-full rounded-xl bg-white border border-slate-200 hover:border-slate-300 focus:bg-white focus:border-blue-500 focus:ring-1 focus:ring-blue-500 px-3.5 py-2 text-xs font-medium text-slate-900 shadow-xs transition-all pr-9"
-                />
-                {agent.name.trim().length > 0 && (
-                  <Check className="w-4 h-4 text-emerald-600 absolute right-3 top-2.5 pointer-events-none" />
-                )}
-              </div>
-            </div>
-
-            {/* Description Textarea with validation checkmark */}
-            <div>
-              <label className="text-xs font-semibold text-slate-800 block mb-1">
-                Description <span className="text-rose-500">*</span>
-              </label>
-              <div className="relative">
-                <textarea
-                  rows={2}
-                  value={agent.description || ''}
-                  onChange={(e) => handleFieldChange('description', e.target.value)}
-                  placeholder="Description"
-                  className="w-full rounded-xl bg-white border border-slate-200 hover:border-slate-300 focus:bg-white focus:border-blue-500 focus:ring-1 focus:ring-blue-500 px-3.5 py-2 text-xs text-slate-900 shadow-xs transition-all pr-9 resize-y"
-                />
-                {(agent.description || '').trim().length > 0 && (
-                  <Check className="w-4 h-4 text-emerald-600 absolute right-3 top-3 pointer-events-none" />
-                )}
-              </div>
-            </div>
-          </div>
-        )}
       </div>
 
-      {/* 3. Advance Configuration Toggle Bar matching Images 2 & 3 */}
-      <div className="flex items-center justify-between py-1 mb-2">
-        <label className="relative inline-flex items-center cursor-pointer">
-          <input
-            type="checkbox"
-            checked={advanceConfigOpen}
-            onChange={(e) => setAdvanceConfigOpen(e.target.checked)}
-            className="sr-only peer"
-          />
-          <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
-          <span className="ml-3 text-xs sm:text-sm font-semibold text-slate-800">
-            Advance configuration
-          </span>
-        </label>
+      {/* 2. AGENT IDENTITY CARD */}
+      <div className="rounded-2xl bg-white border border-slate-200/90 p-5 shadow-xs transition-all">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="md:col-span-1">
+            <label className="text-xs font-bold uppercase tracking-wider text-slate-500 block mb-1.5">
+              Agent Identity & Name <span className="text-rose-500">*</span>
+            </label>
+            <div className="relative">
+              <input
+                type="text"
+                value={agent.name}
+                onChange={(e) => handleFieldChange('name', e.target.value)}
+                placeholder="e.g. Strategic Analyst, Research Assistant..."
+                className="w-full rounded-xl bg-slate-50/70 border border-slate-200 focus:bg-white focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 px-3.5 py-2.5 text-xs font-semibold text-slate-900 shadow-2xs transition-all pr-9"
+              />
+              {agent.name.trim().length > 0 && (
+                <Check className="w-4 h-4 text-emerald-600 absolute right-3 top-3 pointer-events-none" />
+              )}
+            </div>
+            <p className="text-[11px] text-slate-400 mt-1">
+              The public designation for this autonomous agent.
+            </p>
+          </div>
 
-        <button
-          type="button"
-          onClick={() => setAdvanceConfigOpen(!advanceConfigOpen)}
-          className="px-4 py-1.5 rounded-full text-xs font-medium text-slate-700 bg-white border border-slate-300 hover:bg-slate-50 transition-colors shadow-2xs"
-        >
-          {advanceConfigOpen ? 'Hide Advance Configuration' : 'Get Advance Configuration'}
-        </button>
+          <div className="md:col-span-2">
+            <label className="text-xs font-bold uppercase tracking-wider text-slate-500 block mb-1.5">
+              Role & Capability Summary <span className="text-rose-500">*</span>
+            </label>
+            <div className="relative">
+              <input
+                type="text"
+                value={agent.description || ''}
+                onChange={(e) => handleFieldChange('description', e.target.value)}
+                placeholder="Explain the specific mission, domain expertise, and operational boundaries of this agent..."
+                className="w-full rounded-xl bg-slate-50/70 border border-slate-200 focus:bg-white focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 px-3.5 py-2.5 text-xs text-slate-800 shadow-2xs transition-all pr-9"
+              />
+              {(agent.description || '').trim().length > 0 && (
+                <Check className="w-4 h-4 text-emerald-600 absolute right-3 top-3 pointer-events-none" />
+              )}
+            </div>
+            <p className="text-[11px] text-slate-400 mt-1">
+              Appears on the Agent Fleet dashboard and within the Public Discovery Gallery.
+            </p>
+          </div>
+        </div>
       </div>
 
-      {/* 4. Amber or Green Banner matching Images 2, 3 & 4 */}
-      {!isDraftSaved ? (
-        <div className="mb-4 p-3.5 rounded-xl bg-[#FFFBEB] border border-[#FDE68A] text-[#92400E] flex items-center justify-between shadow-xs animate-in fade-in">
-          <div className="flex items-center gap-2.5 text-xs">
-            <AlertTriangle className="w-4 h-4 text-amber-600 flex-shrink-0" />
-            <span>
-              Get the advance configurations to save your agent and enable the Quick Test.
-            </span>
-          </div>
-        </div>
-      ) : (
-        <div className="mb-4 p-3.5 rounded-xl bg-[#ECFDF5] border border-[#A7F3D0] text-[#065F46] flex items-center justify-between shadow-xs animate-in fade-in">
-          <div className="flex items-center gap-2.5 text-xs font-medium">
-            <div className="w-4 h-4 rounded-full border border-emerald-500 text-emerald-600 flex items-center justify-center font-bold text-[10px] flex-shrink-0">
-              ✓
-            </div>
-            <span>
-              Your Agent has been saved as draft. Now You can test your Agent using Quick Test and then do the final save.
-            </span>
-          </div>
-        </div>
-      )}
-
-      {/* 5. Main Advance Configuration Card */}
-      {advanceConfigOpen && (
-        <div className="rounded-2xl bg-white border border-slate-200 shadow-sm overflow-hidden flex flex-col mb-6">
-          {/* Card Header matching screenshot */}
-          <div className="p-4 sm:p-5 border-b border-slate-100 flex items-center justify-between">
-            <div>
-              <h2 className="text-sm font-bold text-slate-900 tracking-tight flex items-center gap-1.5">
-                Advance configuration <span className="text-rose-500">*</span>
-              </h2>
-              <p className="text-xs text-slate-500 mt-0.5">
-                Open this section to view all the configurations for this agent.
-              </p>
-            </div>
+      {/* 3. STUDIO PILLAR NAVIGATION (Modern Segmented Horizontal Tabs) */}
+      <div className="flex items-center gap-1.5 p-1.5 rounded-2xl bg-slate-100/80 border border-slate-200/80 overflow-x-auto scrollbar-none">
+        {tabs.map((tab) => {
+          const Icon = tab.icon;
+          const isActive = activeTab === tab.id;
+          return (
             <button
-              onClick={() => setAdvanceConfigOpen(false)}
-              className="p-1 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors"
+              key={tab.id}
+              type="button"
+              onClick={() => setActiveTab(tab.id as any)}
+              className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-semibold transition-all whitespace-nowrap flex-shrink-0 ${
+                isActive
+                  ? 'bg-white text-indigo-700 shadow-xs border border-slate-200/80'
+                  : 'text-slate-600 hover:text-slate-900 hover:bg-white/50'
+              }`}
             >
-              <X className="w-4 h-4" />
+              <Icon className={`w-4 h-4 ${isActive ? 'text-indigo-600' : 'text-slate-400'}`} />
+              <span>{tab.label}</span>
+              {typeof tab.count === 'number' && (
+                <span
+                  className={`text-[10px] px-1.5 py-0.2 rounded-full font-bold ${
+                    isActive ? 'bg-indigo-50 text-indigo-700' : 'bg-slate-200 text-slate-600'
+                  }`}
+                >
+                  {tab.count}
+                </span>
+              )}
             </button>
-          </div>
+          );
+        })}
+      </div>
 
-          {/* Card Body: 7 Sub-tabs Left Strip + Right Content Area */}
-          <div className="flex flex-col md:flex-row min-h-[460px] md:max-h-[680px]">
-            {/* Left Vertical Sub-Tab Strip */}
-            <div className="w-full md:w-52 border-b md:border-b-0 md:border-r border-slate-100 bg-slate-50/70 p-3 space-y-1 flex-shrink-0 overflow-y-auto">
-              {subTabs.map((tab) => {
-                const Icon = tab.icon;
-                const isActive = activeSubTab === tab.id;
-                return (
-                  <button
-                    key={tab.id}
-                    type="button"
-                    onClick={() => setActiveSubTab(tab.id as any)}
-                    className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-xs transition-all ${
-                      isActive
-                        ? 'bg-[#EFF6FF] text-blue-700 font-semibold shadow-xs border border-blue-200'
-                        : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100/70 font-medium'
-                    }`}
-                  >
-                    <div className="flex items-center gap-2.5">
-                      <Icon className={`w-4 h-4 ${isActive ? 'text-blue-600' : 'text-slate-400'}`} />
-                      <span>{tab.label}</span>
-                    </div>
+      {/* 4. CANVAS CONTENT ACCORDING TO ACTIVE PILLAR */}
 
-                    {tab.badge === 'info' ? (
-                      <Info className="w-3.5 h-3.5 text-amber-500" />
-                    ) : (
-                      <span className="w-1.5 h-1.5 rounded-full bg-slate-300" />
-                    )}
-                  </button>
-                );
-              })}
-            </div>
+      {/* TAB 1: MODEL & INTELLIGENCE */}
+      {activeTab === 'model' && (
+        <div className="space-y-5 animate-in fade-in duration-200">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
+            {/* Left 2 cols: Model configuration */}
+            <div className="lg:col-span-2 rounded-2xl bg-white border border-slate-200/90 p-5 space-y-5 shadow-xs">
+              <div>
+                <h3 className="text-xs font-bold uppercase tracking-wider text-slate-900 flex items-center gap-2">
+                  <Cpu className="w-4 h-4 text-indigo-600" />
+                  Primary Foundation Model
+                </h3>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  Select the core LLM architecture powering autonomous reasoning, analysis, and generation.
+                </p>
+              </div>
 
-            {/* Right Content Area */}
-            <div className="flex-1 p-5 sm:p-6 overflow-y-auto min-h-0">
-              {/* SUB-TAB 1: MODEL (Only Model Selection, NO API Key configuration) */}
-              {activeSubTab === 'model' && (
-                <div className="space-y-6 animate-in fade-in duration-150">
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
-                    {/* Model Client Dropdown */}
-                    <div>
-                      <label className="text-xs font-semibold text-slate-800 block mb-1.5">
-                        Model Client <span className="text-rose-500">*</span>
-                      </label>
-                      <div className="relative">
-                        <select
-                          value={agent.base_model_id || (models[0]?.id || '')}
-                          onChange={(e) => {
-                            const mId = Number(e.target.value);
-                            const selected = models.find((m) => m.id === mId);
-                            onAgentChange({
-                              ...agent,
-                              base_model_id: mId,
-                              base_model_name: selected?.display_name,
-                              provider_name: selected?.provider_name,
-                            });
-                          }}
-                          className="w-full appearance-none rounded-xl bg-white border border-slate-200 hover:border-slate-300 px-3.5 py-2.5 text-xs text-slate-900 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 shadow-xs pr-14 transition-colors font-medium"
-                        >
-                          {models.length === 0 ? (
-                            <option value="">Select Model</option>
-                          ) : (
-                            models.map((m) => (
-                              <option key={m.id} value={m.id}>
-                                {m.display_name} ({m.provider_name.toUpperCase()})
-                              </option>
-                            ))
-                          )}
-                        </select>
-                        {agent.base_model_id && (
-                          <Check className="w-4 h-4 text-emerald-600 absolute right-8 top-3 pointer-events-none" />
-                        )}
-                        <ChevronDown className="w-4 h-4 text-slate-400 absolute right-3 top-3 pointer-events-none" />
-                      </div>
-                    </div>
-
-                    {/* Thinking Level Dropdown */}
-                    <div>
-                      <label className="text-xs font-semibold text-slate-800 block mb-1.5">
-                        Thinking Level
-                      </label>
-                      <div className="relative">
-                        <select
-                          value={thinkingLevel}
-                          onChange={(e) => setThinkingLevel(e.target.value)}
-                          className="w-full appearance-none rounded-xl bg-white border border-slate-200 hover:border-slate-300 px-3.5 py-2.5 text-xs text-slate-900 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 shadow-xs pr-9 transition-colors"
-                        >
-                          <option value="Not supported">Not supported</option>
-                          <option value="Low">Low (Fast & Concise)</option>
-                          <option value="Medium">Medium (Balanced)</option>
-                          <option value="High">High (Deep Reasoning)</option>
-                        </select>
-                        <ChevronDown className="w-4 h-4 text-slate-400 absolute right-3 top-3 pointer-events-none" />
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Specific Base Model Selector */}
-                  <div>
-                    <label className="text-xs font-semibold text-slate-800 block mb-1.5">
-                      Base Model <span className="text-rose-500">*</span>
-                    </label>
-                    <div className="relative">
-                      <select
-                        value={agent.base_model_id || ''}
-                        onChange={(e) => {
-                          const mId = Number(e.target.value);
-                          const selected = models.find((m) => m.id === mId);
-                          onAgentChange({
-                            ...agent,
-                            base_model_id: mId,
-                            base_model_name: selected?.display_name,
-                            provider_name: selected?.provider_name,
-                          });
-                        }}
-                        className="w-full appearance-none rounded-xl bg-white border border-slate-200 hover:border-slate-300 px-3.5 py-2.5 text-xs text-slate-900 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 shadow-xs pr-9 transition-colors font-mono"
-                      >
-                        {selectedProviderModels.length === 0 ? (
-                          models.map((m) => (
-                            <option key={m.id} value={m.id}>
-                              [{m.provider_name.toUpperCase()}] {m.display_name} — ({m.model_identifier})
-                            </option>
-                          ))
-                        ) : (
-                          selectedProviderModels.map((m) => (
-                            <option key={m.id} value={m.id}>
-                              {m.display_name} ({m.model_identifier})
-                            </option>
-                          ))
-                        )}
-                      </select>
-                      <ChevronDown className="w-4 h-4 text-slate-400 absolute right-3 top-3 pointer-events-none" />
-                    </div>
-                  </div>
-
-                  {/* Clean Admin-Managed Provider Banner (NO API KEY INPUT) */}
-                  <div className="rounded-xl border border-slate-200 bg-slate-50/70 p-4 flex items-start gap-3">
-                    <div className="p-2 rounded-lg bg-blue-50 text-blue-600 flex-shrink-0 mt-0.5">
-                      <Lock className="w-4 h-4" />
-                    </div>
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <span className="text-xs font-bold text-slate-900">
-                          {currentProvider?.display_name || 'LLM Gateway'}
-                        </span>
-                        {currentProvider?.is_configured ? (
-                          <span className="flex items-center gap-1 text-[11px] font-medium text-emerald-700 bg-emerald-100 px-2 py-0.2 rounded-full border border-emerald-200">
-                            <CheckCircle2 className="w-3 h-3" /> Ready & Configured
-                          </span>
-                        ) : (
-                          <span className="flex items-center gap-1 text-[11px] font-medium text-amber-700 bg-amber-100 px-2 py-0.2 rounded-full border border-amber-200">
-                            <AlertTriangle className="w-3 h-3" /> Pending Admin Setup
-                          </span>
-                        )}
-                      </div>
-                      <p className="text-[11px] text-slate-500 mt-1">
-                        API credentials and rate limits are managed centrally by Platform Administrators in <strong>Providers & Models (/admin)</strong>. Creators can select any approved model without needing raw API keys.
-                      </p>
-                    </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="text-xs font-semibold text-slate-700 block mb-1.5">
+                    Model Client & Tier <span className="text-rose-500">*</span>
+                  </label>
+                  <div className="relative">
+                    <select
+                      value={agent.base_model_id || (models[0]?.id || '')}
+                      onChange={(e) => {
+                        const mId = Number(e.target.value);
+                        const selected = models.find((m) => m.id === mId);
+                        onAgentChange({
+                          ...agent,
+                          base_model_id: mId,
+                          base_model_name: selected?.display_name,
+                          provider_name: selected?.provider_name,
+                        });
+                      }}
+                      className="w-full appearance-none rounded-xl bg-slate-50/70 border border-slate-200 hover:border-slate-300 px-3.5 py-2.5 text-xs text-slate-900 focus:bg-white focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 shadow-2xs pr-10 font-medium transition-colors"
+                    >
+                      {models.length === 0 ? (
+                        <option value="">Select Foundation Model</option>
+                      ) : (
+                        models.map((m) => (
+                          <option key={m.id} value={m.id}>
+                            {m.display_name} ({m.provider_name.toUpperCase()})
+                          </option>
+                        ))
+                      )}
+                    </select>
+                    <ChevronDown className="w-4 h-4 text-slate-400 absolute right-3 top-3 pointer-events-none" />
                   </div>
                 </div>
-              )}
 
-              {/* SUB-TAB 2: SYSTEM MESSAGE */}
-              {activeSubTab === 'system' && (
-                <div className="space-y-4 animate-in fade-in duration-150">
-                  <div className="flex items-center justify-between pb-2 border-b border-slate-100">
-                    <div>
-                      <h3 className="text-xs font-bold text-slate-900 uppercase tracking-wide">
-                        System Instructions
-                      </h3>
-                      <p className="text-xs text-slate-500 mt-0.5">
-                        Define persona constraints, behavioral rules, and response style.
-                      </p>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => setShowPromptBuilder(true)}
-                      className="flex items-center gap-1.5 text-xs text-blue-600 hover:text-blue-700 bg-blue-50 hover:bg-blue-100 border border-blue-200 px-3 py-1.5 rounded-xl font-medium transition-colors"
+                <div>
+                  <label className="text-xs font-semibold text-slate-700 block mb-1.5">
+                    Reasoning / Thinking Effort
+                  </label>
+                  <div className="relative">
+                    <select
+                      value={thinkingLevel}
+                      onChange={(e) => setThinkingLevel(e.target.value)}
+                      className="w-full appearance-none rounded-xl bg-slate-50/70 border border-slate-200 hover:border-slate-300 px-3.5 py-2.5 text-xs text-slate-900 focus:bg-white focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 shadow-2xs pr-10 transition-colors"
                     >
-                      <Wand2 className="w-3.5 h-3.5" />
-                      Prompt Builder
-                    </button>
+                      <option value="Not supported">Direct Stream (Fast & Efficient)</option>
+                      <option value="Low">Low (Refined Polish)</option>
+                      <option value="Medium">Medium (Balanced Analysis)</option>
+                      <option value="High">High (Deep CoT Reasoning)</option>
+                    </select>
+                    <ChevronDown className="w-4 h-4 text-slate-400 absolute right-3 top-3 pointer-events-none" />
                   </div>
+                </div>
+              </div>
 
-                  <textarea
-                    rows={11}
-                    value={agent.system_instructions || ''}
-                    onChange={(e) => handleFieldChange('system_instructions', e.target.value)}
-                    placeholder="Instructions for how the agent should think and respond...&#10;- Answer concisely and politely&#10;- Cite provided documents when answering factual queries"
-                    className="w-full font-mono rounded-xl bg-slate-50 border border-slate-200 p-4 text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-colors"
+              {/* Exact model identifier display */}
+              <div>
+                <label className="text-xs font-semibold text-slate-700 block mb-1.5">
+                  Underlying Model Architecture
+                </label>
+                <div className="relative">
+                  <select
+                    value={agent.base_model_id || ''}
+                    onChange={(e) => {
+                      const mId = Number(e.target.value);
+                      const selected = models.find((m) => m.id === mId);
+                      onAgentChange({
+                        ...agent,
+                        base_model_id: mId,
+                        base_model_name: selected?.display_name,
+                        provider_name: selected?.provider_name,
+                      });
+                    }}
+                    className="w-full appearance-none rounded-xl bg-slate-50/70 border border-slate-200 hover:border-slate-300 px-3.5 py-2.5 text-xs text-slate-900 focus:bg-white focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 shadow-2xs pr-10 font-mono transition-colors"
+                  >
+                    {selectedProviderModels.length === 0 ? (
+                      models.map((m) => (
+                        <option key={m.id} value={m.id}>
+                          [{m.provider_name.toUpperCase()}] {m.display_name} — ({m.model_identifier})
+                        </option>
+                      ))
+                    ) : (
+                      selectedProviderModels.map((m) => (
+                        <option key={m.id} value={m.id}>
+                          {m.display_name} ({m.model_identifier})
+                        </option>
+                      ))
+                    )}
+                  </select>
+                  <ChevronDown className="w-4 h-4 text-slate-400 absolute right-3 top-3 pointer-events-none" />
+                </div>
+              </div>
+
+              {/* Provider Info Banner */}
+              <div className="rounded-xl border border-indigo-100 bg-gradient-to-r from-indigo-50/50 to-violet-50/30 p-4 flex items-start gap-3">
+                <div className="p-2 rounded-lg bg-indigo-100 text-indigo-700 flex-shrink-0 mt-0.5">
+                  <Activity className="w-4 h-4" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-bold text-slate-900">
+                      Gateway: {currentProvider?.display_name || 'Agent.Studio LLM Engine'}
+                    </span>
+                    {currentProvider?.is_configured ? (
+                      <span className="flex items-center gap-1 text-[11px] font-semibold text-emerald-700 bg-emerald-100/80 px-2 py-0.5 rounded-full border border-emerald-200">
+                        <CheckCircle2 className="w-3 h-3" /> Operational
+                      </span>
+                    ) : (
+                      <span className="flex items-center gap-1 text-[11px] font-semibold text-amber-700 bg-amber-100 px-2 py-0.5 rounded-full border border-amber-200">
+                        <AlertTriangle className="w-3 h-3" /> Admin Gateway Pending
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-[11px] text-slate-600 mt-1 leading-relaxed">
+                    Provider keys and enterprise encryption are managed securely by the platform gateway. Agents consume verified endpoints without exposing tokens to browser clients.
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* Right col: Core Engine Capabilities */}
+            <div className="rounded-2xl bg-white border border-slate-200/90 p-5 space-y-4 shadow-xs">
+              <div>
+                <h3 className="text-xs font-bold uppercase tracking-wider text-slate-900 flex items-center gap-2">
+                  <Zap className="w-4 h-4 text-amber-500" />
+                  Engine Capabilities
+                </h3>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  Configure real-time memory and retrieval switches.
+                </p>
+              </div>
+
+              <div className="divide-y divide-slate-100 space-y-1">
+                <div className="pt-2">
+                  <Toggle
+                    label="Semantic RAG Grounding"
+                    description="Extracts contextual chunks from uploaded documents to substantiate responses."
+                    checked={agent.capability_rag}
+                    onChange={(val) => handleFieldChange('capability_rag', val)}
                   />
                 </div>
+                <div className="pt-3">
+                  <Toggle
+                    label="Conversational Memory"
+                    description="Maintains multi-turn context and conversation states across interactions."
+                    checked={agent.capability_memory}
+                    onChange={(val) => handleFieldChange('capability_memory', val)}
+                  />
+                </div>
+                <div className="pt-3">
+                  <Toggle
+                    label="Token Streaming"
+                    description="Streams synthesized tokens in real-time as emitted by the inference cluster."
+                    checked={agent.capability_streaming}
+                    onChange={(val) => handleFieldChange('capability_streaming', val)}
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* TAB 2: PERSONA & INSTRUCTIONS */}
+      {activeTab === 'instructions' && (
+        <div className="space-y-5 animate-in fade-in duration-200">
+          <div className="rounded-2xl bg-white border border-slate-200/90 p-5 space-y-4 shadow-xs">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3 border-b border-slate-100">
+              <div>
+                <h3 className="text-xs font-bold uppercase tracking-wider text-slate-900 flex items-center gap-2">
+                  <Sparkles className="w-4 h-4 text-indigo-600" />
+                  System Instructions & Persona Definition
+                </h3>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  Program the agent's tone, constraints, problem-solving methodology, and output format.
+                </p>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setShowPromptBuilder(true)}
+                className="flex items-center gap-1.5 text-xs text-indigo-700 hover:text-indigo-800 bg-indigo-50 hover:bg-indigo-100/80 border border-indigo-200/80 px-3 py-1.5 rounded-xl font-semibold transition-all self-start sm:self-auto"
+              >
+                <Wand2 className="w-3.5 h-3.5" />
+                <span>Prompt Builder AI</span>
+              </button>
+            </div>
+
+            <div className="relative">
+              <textarea
+                rows={12}
+                value={agent.system_instructions || ''}
+                onChange={(e) => handleFieldChange('system_instructions', e.target.value)}
+                placeholder="Define agent personality and operating guidelines...&#10;&#10;# Persona: Senior Autonomous Analyst&#10;- Always answer queries factually and cite sources.&#10;- When mathematical calculations are needed, invoke the calculator tool.&#10;- Synthesize insights into actionable bullet points."
+                className="w-full font-mono rounded-xl bg-slate-900 text-slate-100 p-4 text-xs leading-relaxed placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 shadow-inner resize-y"
+              />
+              <div className="absolute right-3 bottom-3 text-[10px] font-mono text-slate-400 bg-slate-800/80 px-2 py-0.5 rounded-md border border-slate-700">
+                {(agent.system_instructions || '').length} characters
+              </div>
+            </div>
+          </div>
+
+          {/* Conversation Starters */}
+          <div className="rounded-2xl bg-white border border-slate-200/90 p-5 space-y-4 shadow-xs">
+            <div>
+              <h3 className="text-xs font-bold uppercase tracking-wider text-slate-900 flex items-center gap-2">
+                <MessageSquare className="w-4 h-4 text-indigo-600" />
+                Conversation Starters & Guided Prompts
+              </h3>
+              <p className="text-xs text-slate-500 mt-0.5">
+                Suggested prompts presented to users when initiating an interactive session with this agent.
+              </p>
+            </div>
+
+            <div className="flex flex-wrap gap-2">
+              {(agent.conversation_starters || []).map((starter, idx) => (
+                <div
+                  key={idx}
+                  className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200/70 border border-slate-200 text-xs text-slate-800 font-medium transition-colors"
+                >
+                  <span>{starter}</span>
+                  <button
+                    type="button"
+                    onClick={() => handleRemoveStarter(idx)}
+                    className="text-slate-400 hover:text-rose-600 transition-colors"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              ))}
+            </div>
+
+            <div className="flex items-center gap-2 pt-1">
+              <input
+                type="text"
+                value={newStarter}
+                onChange={(e) => setNewStarter(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    handleAddStarter();
+                  }
+                }}
+                placeholder="Enter a prompt starter (e.g. 'Summarize today\'s financial metrics') and press Enter..."
+                className="flex-1 rounded-xl bg-slate-50 border border-slate-200 px-3.5 py-2.5 text-xs text-slate-900 placeholder-slate-400 focus:outline-none focus:border-indigo-500 focus:bg-white shadow-2xs"
+              />
+              <button
+                type="button"
+                onClick={handleAddStarter}
+                className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold shadow-xs transition-all"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                <span>Add Starter</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* TAB 3: KNOWLEDGE BASE (RAG) */}
+      {activeTab === 'knowledge' && (
+        <div className="space-y-5 animate-in fade-in duration-200">
+          <div className="rounded-2xl bg-white border border-slate-200/90 p-5 space-y-4 shadow-xs">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+              <div>
+                <h3 className="text-xs font-bold uppercase tracking-wider text-slate-900 flex items-center gap-2">
+                  <Database className="w-4 h-4 text-indigo-600" />
+                  Semantic Document Repository
+                </h3>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  Ground agent responses with proprietary knowledge chunks and verifiable citations.
+                </p>
+              </div>
+
+              {!agent.capability_rag && (
+                <span className="text-[11px] text-amber-700 font-semibold bg-amber-50 border border-amber-200 px-2.5 py-1 rounded-xl">
+                  RAG Switch is Currently Off
+                </span>
               )}
+            </div>
 
-              {/* SUB-TAB 3: SKILLS (RAG Knowledge + Memory + Streaming) */}
-              {activeSubTab === 'skills' && (
-                <div className="space-y-5 animate-in fade-in duration-150">
-                  <div>
-                    <h3 className="text-xs font-bold text-slate-900 uppercase tracking-wide">
-                      Skills & Capabilities
-                    </h3>
-                    <p className="text-xs text-slate-500 mt-0.5">
-                      Ground agent responses with document knowledge retrieval, conversation memory, and streaming.
-                    </p>
-                  </div>
+            {/* Upload Dropzone */}
+            <label className="flex flex-col items-center justify-center p-6 border-2 border-dashed border-slate-200 hover:border-indigo-400 rounded-2xl bg-slate-50/60 hover:bg-indigo-50/20 cursor-pointer transition-all group">
+              <input
+                type="file"
+                multiple
+                accept=".pdf,.txt,.docx,.md"
+                onChange={handleFileUpload}
+                disabled={isUploading || !agent.id}
+                className="hidden"
+              />
+              <div className="p-3 rounded-2xl bg-indigo-100/80 text-indigo-600 group-hover:scale-105 transition-transform shadow-xs">
+                {isUploading ? (
+                  <Loader2 className="w-6 h-6 animate-spin" />
+                ) : (
+                  <UploadCloud className="w-6 h-6" />
+                )}
+              </div>
+              <span className="text-xs font-bold text-slate-900 mt-3">
+                {isUploading ? 'Chunking and generating semantic vectors...' : 'Upload Knowledge Documents'}
+              </span>
+              <span className="text-[11px] text-slate-500 mt-0.5">
+                {!agent.id
+                  ? 'Please save agent as draft first before uploading files'
+                  : 'Supports PDF, Word (.docx), Markdown (.md), and Text files up to 25MB'}
+              </span>
+            </label>
 
-                  {/* Core Capabilities Toggles */}
-                  <div className="divide-y divide-slate-100 rounded-xl bg-slate-50/60 p-4 border border-slate-200">
-                    <Toggle
-                      label="Document Knowledge / RAG"
-                      description="Retrieves semantic chunks from uploaded documents to answer user queries with citations."
-                      checked={agent.capability_rag}
-                      onChange={(val) => handleFieldChange('capability_rag', val)}
-                    />
-                    <Toggle
-                      label="Conversation Memory"
-                      description="Retains conversational context across multi-turn interactions within context limits."
-                      checked={agent.capability_memory}
-                      onChange={(val) => handleFieldChange('capability_memory', val)}
-                    />
-                    <Toggle
-                      label="Streaming Responses"
-                      description="Streams output tokens in real-time as generated by the underlying model adapter."
-                      checked={agent.capability_streaming}
-                      onChange={(val) => handleFieldChange('capability_streaming', val)}
-                    />
-                  </div>
+            {uploadError && (
+              <div className="p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-xs flex items-center gap-2">
+                <AlertTriangle className="w-4 h-4 flex-shrink-0" />
+                <span>{uploadError}</span>
+              </div>
+            )}
 
-                  {/* Knowledge Base Documents Upload Section - Closes when Document Knowledge / RAG is turned off */}
-                  {agent.capability_rag ? (
-                    <div className="space-y-3 pt-2 animate-in fade-in duration-200">
-                      <h4 className="text-xs font-semibold text-slate-800 uppercase tracking-wider">
-                        Knowledge Base Documents (PDF, DOCX, TXT)
-                      </h4>
+            {/* Document Index List */}
+            <div className="space-y-2 pt-2">
+              <div className="flex items-center justify-between text-xs text-slate-500 font-semibold px-1">
+                <span>Indexed Files ({documents.length})</span>
+                <span>Vector Status</span>
+              </div>
 
-                      {/* Upload Dropzone */}
-                      <label className="flex flex-col items-center justify-center p-5 border-2 border-dashed border-slate-200 hover:border-blue-400 rounded-2xl bg-slate-50/50 hover:bg-blue-50/30 cursor-pointer transition-colors group">
-                        <input
-                          type="file"
-                          multiple
-                          accept=".pdf,.txt,.docx,.md"
-                          onChange={handleFileUpload}
-                          disabled={isUploading}
-                          className="hidden"
-                        />
-                        <div className="p-2.5 rounded-full bg-blue-100 text-blue-600 group-hover:scale-105 transition-transform">
-                          {isUploading ? (
-                            <Loader2 className="w-5 h-5 animate-spin" />
-                          ) : (
-                            <UploadCloud className="w-5 h-5" />
-                          )}
-                        </div>
-                        <span className="text-xs font-semibold text-slate-800 mt-2">
-                          {isUploading ? 'Extracting text and generating vectors...' : 'Click or drag documents to upload'}
-                        </span>
-                        <span className="text-[11px] text-slate-500 mt-0.5">
-                          Supports PDF, DOCX, TXT files up to 25MB
-                        </span>
-                      </label>
-
-                      {uploadError && (
-                        <div className="p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-xs">
-                          {uploadError}
-                        </div>
-                      )}
-
-                      {/* Document List */}
-                      <div className="space-y-2 pt-1">
-                        {documents.length === 0 ? (
-                          <p className="text-xs text-slate-400 text-center py-3">
-                            No documents attached yet. Upload a document to ground this agent with verified facts.
-                          </p>
-                        ) : (
-                          documents.map((doc) => (
-                            <div
-                              key={doc.id}
-                              className="flex items-center justify-between p-3 rounded-xl bg-white border border-slate-200 shadow-xs"
-                            >
-                              <div className="flex items-center gap-3 min-w-0">
-                                <div className="p-2 rounded-lg bg-blue-50 text-blue-600">
-                                  <FileText className="w-4 h-4" />
-                                </div>
-                                <div className="min-w-0">
-                                  <p className="text-xs font-semibold text-slate-900 truncate">
-                                    {doc.filename}
-                                  </p>
-                                  <p className="text-[11px] text-slate-500 font-mono">
-                                    {Math.round(doc.file_size / 1024)} KB • {doc.chunk_count} vector chunks
-                                  </p>
-                                </div>
-                              </div>
-
-                              <div className="flex items-center gap-3">
-                                <span
-                                  className={`text-[10px] px-2.5 py-0.5 rounded-full font-medium ${
-                                    doc.status === 'completed'
-                                      ? 'bg-emerald-100 text-emerald-800 border border-emerald-200'
-                                      : doc.status === 'processing'
-                                      ? 'bg-amber-100 text-amber-800 border border-amber-200 animate-pulse'
-                                      : 'bg-rose-100 text-rose-800 border border-rose-200'
-                                  }`}
-                                >
-                                  {doc.status === 'completed' ? 'Indexed' : doc.status}
-                                </span>
-                                <button
-                                  type="button"
-                                  onClick={() => handleDeleteDocument(doc.id)}
-                                  className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors"
-                                >
-                                  <Trash2 className="w-3.5 h-3.5" />
-                                </button>
-                              </div>
-                            </div>
-                          ))
-                        )}
+              {documents.length === 0 ? (
+                <div className="p-8 rounded-2xl border border-dashed border-slate-200 bg-slate-50/50 text-center">
+                  <BookOpen className="w-8 h-8 text-slate-300 mx-auto mb-2" />
+                  <p className="text-xs font-semibold text-slate-700">No knowledge documents attached yet</p>
+                  <p className="text-[11px] text-slate-400 mt-1 max-w-sm mx-auto">
+                    Attach reference documents to allow this agent to perform retrieval-augmented generation and quote exact source materials.
+                  </p>
+                </div>
+              ) : (
+                documents.map((doc) => (
+                  <div
+                    key={doc.id}
+                    className="flex items-center justify-between p-3.5 rounded-xl bg-slate-50/70 hover:bg-slate-50 border border-slate-200/80 transition-colors"
+                  >
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div className="p-2.5 rounded-xl bg-white border border-slate-200 text-indigo-600 shadow-2xs">
+                        <FileText className="w-4 h-4" />
+                      </div>
+                      <div className="min-w-0">
+                        <p className="text-xs font-bold text-slate-900 truncate">
+                          {doc.filename}
+                        </p>
+                        <p className="text-[11px] text-slate-500 font-mono">
+                          {Math.round(doc.file_size / 1024)} KB • {doc.chunk_count} vector chunks indexed
+                        </p>
                       </div>
                     </div>
-                  ) : (
-                    <div className="p-4 rounded-xl bg-slate-50 border border-slate-200 text-center text-xs text-slate-500 mt-2">
-                      <p className="font-semibold text-slate-700">Document Knowledge / RAG is turned off</p>
-                      <p className="mt-1 text-[11px] text-slate-400">
-                        The document upload panel is closed. Turn on the "Document Knowledge / RAG" switch above to attach documents and enable vector retrieval.
-                      </p>
-                    </div>
-                  )}
-                </div>
-              )}
 
-              {/* SUB-TAB 4: MCP */}
-              {activeSubTab === 'mcp' && (
-                <div className="space-y-4 animate-in fade-in duration-150">
-                  <div>
-                    <h3 className="text-xs font-bold text-slate-900 uppercase tracking-wide">
-                      Model Context Protocol (MCP)
-                    </h3>
-                    <p className="text-xs text-slate-500 mt-0.5">
-                      Connect to standardized Model Context Protocol servers to provide dynamic context.
-                    </p>
-                  </div>
-
-                  <div className="p-6 rounded-2xl bg-slate-50 border border-slate-200 text-center space-y-3">
-                    <div className="inline-flex p-3 rounded-full bg-blue-100 text-blue-600">
-                      <Layers className="w-6 h-6" />
-                    </div>
-                    <h4 className="text-sm font-semibold text-slate-800">Model Context Protocol Ready</h4>
-                    <p className="text-xs text-slate-500 max-w-md mx-auto">
-                      AGENT.STUDIO supports MCP protocol endpoints. External MCP server connectors can be registered via the Admin Console.
-                    </p>
-                    <div className="pt-2">
-                      <span className="text-[11px] font-semibold text-blue-700 bg-blue-50 px-3 py-1 rounded-full border border-blue-200">
-                        Protocol Schema v1.0 Supported
+                    <div className="flex items-center gap-3">
+                      <span
+                        className={`text-[10px] px-2.5 py-0.5 rounded-full font-semibold border ${
+                          doc.status === 'completed'
+                            ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                            : doc.status === 'processing'
+                            ? 'bg-amber-50 text-amber-700 border-amber-200 animate-pulse'
+                            : 'bg-rose-50 text-rose-700 border-rose-200'
+                        }`}
+                      >
+                        {doc.status === 'completed' ? 'Vectorized' : doc.status}
                       </span>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* SUB-TAB 5: TOOLS & CAPABILITIES */}
-              {activeSubTab === 'tools' && (
-                <div className="space-y-4 animate-in fade-in duration-150 flex flex-col">
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-2 border-b border-slate-100">
-                    <div>
-                      <h3 className="text-xs font-bold text-slate-900 uppercase tracking-wide flex items-center gap-2">
-                        Tools & Capabilities
-                        <span className="text-[10px] font-semibold text-blue-700 bg-blue-50 px-2 py-0.5 rounded-full border border-blue-200">
-                          {(agent.enabled_tools || []).length} / {availableTools.length} Active
-                        </span>
-                      </h3>
-                      <p className="text-xs text-slate-500 mt-0.5">
-                        Equip this agent with practical Python capabilities. Enabled tools are provided to Gemini for autonomous function calling.
-                      </p>
-                    </div>
-
-                    <a
-                      href="/studio?view=tools"
-                      className="text-xs text-blue-600 hover:text-blue-700 font-semibold flex items-center gap-1 self-start sm:self-auto"
-                    >
-                      <span>Tools Marketplace</span>
-                      <ArrowRight className="w-3 h-3" />
-                    </a>
-                  </div>
-
-                  {/* Filter and Search Bar */}
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pt-1">
-                    <div className="flex items-center gap-1 overflow-x-auto pb-1 sm:pb-0 scrollbar-none">
-                      {['All', 'Documents & Files', 'Data Processing', 'Data Utilities', 'Validation & Utilities', 'Web & Search', 'Gemini AI Tools'].map((cat) => (
-                        <button
-                          key={cat}
-                          type="button"
-                          onClick={() => setToolsCategory(cat)}
-                          className={`px-2.5 py-1 rounded-lg text-[11px] font-semibold transition-colors whitespace-nowrap ${
-                            toolsCategory === cat
-                              ? 'bg-blue-600 text-white'
-                              : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-                          }`}
-                        >
-                          {cat}
-                        </button>
-                      ))}
-                    </div>
-
-                    <div className="relative min-w-[200px]">
-                      <Search className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
-                      <input
-                        type="text"
-                        placeholder="Filter tools..."
-                        value={toolsSearch}
-                        onChange={(e) => setToolsSearch(e.target.value)}
-                        className="w-full pl-8 pr-3 py-1 rounded-lg bg-slate-50 border border-slate-200 text-xs focus:outline-none focus:border-blue-500"
-                      />
-                    </div>
-                  </div>
-
-                  {/* Tools Grid Container with dedicated vertical scrolling */}
-                  <div className="overflow-y-auto max-h-[460px] sm:max-h-[500px] pr-1.5 pt-1 pb-3 focus:outline-none">
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    {availableTools
-                      .filter((t) => {
-                        const matchesCat = toolsCategory === 'All' || t.category === toolsCategory;
-                        const matchesSearch = !toolsSearch || t.name.toLowerCase().includes(toolsSearch.toLowerCase()) || t.description.toLowerCase().includes(toolsSearch.toLowerCase());
-                        return matchesCat && matchesSearch;
-                      })
-                      .map((tool) => {
-                        const isToolAdminDisabled = !tool.is_enabled;
-                        const isAgentToolEnabled = (agent.enabled_tools || []).includes(tool.id);
-
-                        return (
-                          <div
-                            key={tool.id}
-                            className={`p-3.5 rounded-xl border transition-all flex flex-col justify-between ${
-                              isToolAdminDisabled
-                                ? 'bg-slate-50/80 border-slate-200 opacity-70'
-                                : isAgentToolEnabled
-                                ? 'bg-blue-50/40 border-blue-300 shadow-xs ring-1 ring-blue-500/10'
-                                : 'bg-white border-slate-200 hover:border-slate-300'
-                            }`}
-                          >
-                            <div>
-                              <div className="flex items-start justify-between gap-2">
-                                <div className="flex items-center gap-2.5">
-                                  <div className="p-2 rounded-lg bg-white border border-slate-100 shadow-2xs">
-                                    {tool.icon === 'FileText' && <FileText className="w-4 h-4 text-blue-500" />}
-                                    {tool.icon === 'FileSpreadsheet' && <FileSpreadsheet className="w-4 h-4 text-emerald-500" />}
-                                    {tool.icon === 'FileJson' && <FileJson className="w-4 h-4 text-amber-500" />}
-                                    {tool.icon === 'Calculator' && <Calculator className="w-4 h-4 text-cyan-500" />}
-                                    {tool.icon === 'Clock' && <Clock className="w-4 h-4 text-indigo-500" />}
-                                    {tool.icon === 'BarChart3' && <BarChart3 className="w-4 h-4 text-violet-500" />}
-                                    {tool.icon === 'Link' && <Link className="w-4 h-4 text-sky-500" />}
-                                    {tool.icon === 'Sparkles' && <Sparkles className="w-4 h-4 text-teal-500" />}
-                                    {tool.icon === 'Copy' && <Copy className="w-4 h-4 text-purple-500" />}
-                                    {tool.icon === 'Cpu' && <Cpu className="w-4 h-4 text-pink-500" />}
-                                    {tool.icon === 'Search' && <Search className="w-4 h-4 text-blue-600" />}
-                                    {tool.icon === 'Globe' && <Globe className="w-4 h-4 text-emerald-600" />}
-                                  </div>
-
-                                  <div>
-                                    <h4 className="text-xs font-bold text-slate-900 leading-tight">{tool.name}</h4>
-                                    <span className="text-[10px] text-slate-400 font-medium">{tool.category}</span>
-                                  </div>
-                                </div>
-
-                                {/* Enable Switch or Admin Disabled Badge */}
-                                {isToolAdminDisabled ? (
-                                  <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full bg-slate-200 text-slate-600">
-                                    <Lock className="w-2.5 h-2.5" />
-                                    Disabled by Admin
-                                  </span>
-                                ) : (
-                                  <label className="relative inline-flex items-center cursor-pointer">
-                                    <input
-                                      type="checkbox"
-                                      checked={isAgentToolEnabled}
-                                      onChange={() => {
-                                        const current = agent.enabled_tools || [];
-                                        const next = isAgentToolEnabled
-                                          ? current.filter((id) => id !== tool.id)
-                                          : [...current, tool.id];
-                                        handleFieldChange('enabled_tools', next);
-                                      }}
-                                      className="sr-only peer"
-                                    />
-                                    <div className="w-8 h-4.5 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-3.5 after:w-3.5 after:transition-all peer-checked:bg-blue-600"></div>
-                                  </label>
-                                )}
-                              </div>
-
-                              <p className="text-[11px] text-slate-600 mt-2 line-clamp-2 leading-relaxed">
-                                {tool.description}
-                              </p>
-                            </div>
-
-                            <div className="mt-3 pt-2.5 border-t border-slate-100 flex items-center justify-between text-[11px]">
-                              <button
-                                type="button"
-                                onClick={() => setActiveConfigureTool(tool)}
-                                className="text-slate-500 hover:text-slate-800 font-medium flex items-center gap-1"
-                              >
-                                <Settings className="w-3 h-3" />
-                                <span>Options</span>
-                              </button>
-
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  setActiveTestTool(tool);
-                                  setTestResult(null);
-                                  // Seed defaults
-                                  if (tool.id === 'calculator') setTestParams({ expression: '45 * 12 + 100' });
-                                  else if (tool.id === 'datetime_tool') setTestParams({ operation: 'now' });
-                                  else if (tool.id === 'url_validator') setTestParams({ url: 'https://example.com' });
-                                  else setTestParams({});
-                                }}
-                                className="text-blue-600 hover:text-blue-700 font-semibold flex items-center gap-1"
-                              >
-                                <Play className="w-3 h-3 fill-blue-600" />
-                                <span>Test</span>
-                              </button>
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* SUB-TAB 6: RUNTIME */}
-              {activeSubTab === 'runtime' && (
-                <div className="space-y-5 animate-in fade-in duration-150">
-                  <div>
-                    <h3 className="text-xs font-bold text-slate-900 uppercase tracking-wide">
-                      Runtime Versioning & Publication
-                    </h3>
-                    <p className="text-xs text-slate-500 mt-0.5">
-                      Manage agent lifecycle: Draft → Tested → Published → Live in Public Gallery.
-                    </p>
-                  </div>
-
-                  <div className="p-4 rounded-xl bg-slate-50 border border-slate-200 space-y-3">
-                    <div className="flex items-center justify-between text-xs">
-                      <span className="font-semibold text-slate-800">Deployment State</span>
-                      <span className="font-mono text-blue-600 font-bold uppercase">{agent.status}</span>
-                    </div>
-                    <div className="flex items-center justify-between text-xs">
-                      <span className="font-semibold text-slate-800">Current Version</span>
-                      <span className="font-mono text-slate-600">v{agent.current_version}</span>
-                    </div>
-                    <div className="flex items-center justify-between text-xs">
-                      <span className="font-semibold text-slate-800">Public Gallery Visibility</span>
-                      <span className="font-medium text-slate-700">{agent.is_public ? 'Publicly Listed' : 'Private'}</span>
-                    </div>
-                  </div>
-
-                  <div className="flex items-center gap-3 pt-2">
-                    {agent.status === 'published' && (
                       <button
                         type="button"
-                        onClick={handleUnpublish}
-                        disabled={isSaving}
-                        className="px-4 py-2 rounded-xl text-xs font-medium text-rose-700 bg-rose-50 border border-rose-200 hover:bg-rose-100 transition-colors"
+                        onClick={() => handleDeleteDocument(doc.id)}
+                        className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors"
+                        title="Remove Document"
                       >
-                        Unpublish Agent
+                        <Trash2 className="w-4 h-4" />
                       </button>
-                    )}
-
-                    <button
-                      type="button"
-                      onClick={() => setShowShareModal(true)}
-                      className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-medium text-slate-700 bg-white border border-slate-200 hover:bg-slate-50 transition-colors"
-                    >
-                      <Share2 className="w-3.5 h-3.5" />
-                      Share Embed / Link
-                    </button>
+                    </div>
                   </div>
-                </div>
-              )}
-
-              {/* SUB-TAB 7: SAMPLE PROMPTS */}
-              {activeSubTab === 'prompts' && (
-                <div className="space-y-4 animate-in fade-in duration-150">
-                  <div>
-                    <h3 className="text-xs font-bold text-slate-900 uppercase tracking-wide">
-                      Conversation Starters
-                    </h3>
-                    <p className="text-xs text-slate-500 mt-0.5">
-                      Provide sample prompts to guide users during their first interaction with this agent.
-                    </p>
-                  </div>
-
-                  <div className="flex flex-wrap gap-2">
-                    {(agent.conversation_starters || []).map((starter, idx) => (
-                      <div
-                        key={idx}
-                        className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-blue-50 border border-blue-200 text-xs text-blue-900 font-medium"
-                      >
-                        <span>{starter}</span>
-                        <button
-                          type="button"
-                          onClick={() => handleRemoveStarter(idx)}
-                          className="text-blue-500 hover:text-rose-600 transition-colors"
-                        >
-                          <X className="w-3.5 h-3.5" />
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-
-                  <div className="flex items-center gap-2 pt-2">
-                    <input
-                      type="text"
-                      value={newStarter}
-                      onChange={(e) => setNewStarter(e.target.value)}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter') {
-                          e.preventDefault();
-                          handleAddStarter();
-                        }
-                      }}
-                      placeholder="Enter prompt starter and press Enter..."
-                      className="flex-1 rounded-xl bg-white border border-slate-200 px-3.5 py-2 text-xs text-slate-900 placeholder-slate-400 focus:outline-none focus:border-blue-500 shadow-xs"
-                    />
-                    <button
-                      type="button"
-                      onClick={handleAddStarter}
-                      className="flex items-center gap-1 px-4 py-2 rounded-xl bg-blue-600 text-white hover:bg-blue-700 text-xs font-semibold shadow-xs transition-all"
-                    >
-                      <Plus className="w-3.5 h-3.5" />
-                      Add
-                    </button>
-                  </div>
-                </div>
+                ))
               )}
             </div>
           </div>
         </div>
       )}
 
+      {/* TAB 4: CAPABILITIES & TOOLS */}
+      {activeTab === 'tools' && (
+        <div className="space-y-4 animate-in fade-in duration-200 flex flex-col">
+          <div className="rounded-2xl bg-white border border-slate-200/90 p-5 space-y-4 shadow-xs">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3 border-b border-slate-100">
+              <div>
+                <h3 className="text-xs font-bold uppercase tracking-wider text-slate-900 flex items-center gap-2">
+                  <Wrench className="w-4 h-4 text-indigo-600" />
+                  System Capabilities & Execution Tools
+                  <span className="text-[10px] font-bold text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded-full border border-indigo-200/80">
+                    {(agent.enabled_tools || []).length} of {availableTools.length} Armed
+                  </span>
+                </h3>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  Equip this agent with deterministic computation, file transformation, and real-time retrieval tools.
+                </p>
+              </div>
 
+              <div className="relative min-w-[220px]">
+                <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                <input
+                  type="text"
+                  placeholder="Filter capabilities..."
+                  value={toolsSearch}
+                  onChange={(e) => setToolsSearch(e.target.value)}
+                  className="w-full pl-8.5 pr-3 py-1.5 rounded-xl bg-slate-50 border border-slate-200 text-xs focus:outline-none focus:border-indigo-500"
+                />
+              </div>
+            </div>
+
+            {/* Filter pills */}
+            <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none">
+              {['All', 'Documents & Files', 'Data Processing', 'Data Utilities', 'Validation & Utilities', 'Web & Search', 'Gemini AI Tools'].map((cat) => (
+                <button
+                  key={cat}
+                  type="button"
+                  onClick={() => setToolsCategory(cat)}
+                  className={`px-3 py-1 rounded-xl text-[11px] font-semibold transition-all whitespace-nowrap ${
+                    toolsCategory === cat
+                      ? 'bg-indigo-600 text-white shadow-xs'
+                      : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                  }`}
+                >
+                  {cat}
+                </button>
+              ))}
+            </div>
+
+            {/* Tools Grid */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 pt-1">
+              {availableTools
+                .filter((t) => {
+                  const matchesCat = toolsCategory === 'All' || t.category === toolsCategory;
+                  const matchesSearch =
+                    !toolsSearch ||
+                    t.name.toLowerCase().includes(toolsSearch.toLowerCase()) ||
+                    t.description.toLowerCase().includes(toolsSearch.toLowerCase());
+                  return matchesCat && matchesSearch;
+                })
+                .map((tool) => {
+                  const isToolAdminDisabled = !tool.is_enabled;
+                  const isAgentToolEnabled = (agent.enabled_tools || []).includes(tool.id);
+
+                  return (
+                    <div
+                      key={tool.id}
+                      className={`p-4 rounded-2xl border transition-all flex flex-col justify-between ${
+                        isToolAdminDisabled
+                          ? 'bg-slate-50/70 border-slate-200 opacity-60'
+                          : isAgentToolEnabled
+                          ? 'bg-indigo-50/30 border-indigo-200 shadow-xs ring-1 ring-indigo-500/10'
+                          : 'bg-white border-slate-200 hover:border-slate-300'
+                      }`}
+                    >
+                      <div>
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="flex items-center gap-3">
+                            <div className="p-2.5 rounded-xl bg-white border border-slate-200/80 shadow-2xs">
+                              {tool.icon === 'FileText' && <FileText className="w-4 h-4 text-indigo-600" />}
+                              {tool.icon === 'FileSpreadsheet' && <FileSpreadsheet className="w-4 h-4 text-emerald-600" />}
+                              {tool.icon === 'FileJson' && <FileJson className="w-4 h-4 text-amber-600" />}
+                              {tool.icon === 'Calculator' && <Calculator className="w-4 h-4 text-cyan-600" />}
+                              {tool.icon === 'Clock' && <Clock className="w-4 h-4 text-violet-600" />}
+                              {tool.icon === 'BarChart3' && <BarChart3 className="w-4 h-4 text-indigo-500" />}
+                              {tool.icon === 'Link' && <Link className="w-4 h-4 text-sky-600" />}
+                              {tool.icon === 'Sparkles' && <Sparkles className="w-4 h-4 text-teal-600" />}
+                              {tool.icon === 'Copy' && <Copy className="w-4 h-4 text-purple-600" />}
+                              {tool.icon === 'Cpu' && <Cpu className="w-4 h-4 text-pink-600" />}
+                              {tool.icon === 'Search' && <Search className="w-4 h-4 text-indigo-600" />}
+                              {tool.icon === 'Globe' && <Globe className="w-4 h-4 text-emerald-600" />}
+                            </div>
+
+                            <div>
+                              <h4 className="text-xs font-bold text-slate-900 leading-tight">{tool.name}</h4>
+                              <span className="text-[10px] text-slate-400 font-medium">{tool.category}</span>
+                            </div>
+                          </div>
+
+                          {/* Toggle */}
+                          {isToolAdminDisabled ? (
+                            <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full bg-slate-200 text-slate-600">
+                              Locked
+                            </span>
+                          ) : (
+                            <label className="relative inline-flex items-center cursor-pointer">
+                              <input
+                                type="checkbox"
+                                checked={isAgentToolEnabled}
+                                onChange={() => {
+                                  const current = agent.enabled_tools || [];
+                                  const next = isAgentToolEnabled
+                                    ? current.filter((id) => id !== tool.id)
+                                    : [...current, tool.id];
+                                  handleFieldChange('enabled_tools', next);
+                                }}
+                                className="sr-only peer"
+                              />
+                              <div className="w-8 h-4.5 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-3.5 after:w-3.5 after:transition-all peer-checked:bg-indigo-600"></div>
+                            </label>
+                          )}
+                        </div>
+
+                        <p className="text-[11px] text-slate-600 mt-2.5 line-clamp-2 leading-relaxed">
+                          {tool.description}
+                        </p>
+                      </div>
+
+                      <div className="mt-3.5 pt-2.5 border-t border-slate-100 flex items-center justify-between text-[11px]">
+                        <button
+                          type="button"
+                          onClick={() => setActiveConfigureTool(tool)}
+                          className="text-slate-500 hover:text-slate-900 font-medium flex items-center gap-1 transition-colors"
+                        >
+                          <Settings className="w-3 h-3" />
+                          <span>Schema</span>
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setActiveTestTool(tool);
+                            setTestResult(null);
+                            if (tool.id === 'calculator') setTestParams({ expression: '45 * 12 + 100' });
+                            else if (tool.id === 'datetime_tool') setTestParams({ operation: 'now' });
+                            else if (tool.id === 'url_validator') setTestParams({ url: 'https://example.com' });
+                            else setTestParams({});
+                          }}
+                          className="text-indigo-600 hover:text-indigo-700 font-semibold flex items-center gap-1 transition-colors"
+                        >
+                          <Play className="w-3 h-3 fill-indigo-600" />
+                          <span>Sandbox Test</span>
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* TAB 5: RUNTIME & GOVERNANCE */}
+      {activeTab === 'runtime' && (
+        <div className="space-y-5 animate-in fade-in duration-200">
+          <div className="rounded-2xl bg-white border border-slate-200/90 p-5 space-y-4 shadow-xs">
+            <div>
+              <h3 className="text-xs font-bold uppercase tracking-wider text-slate-900 flex items-center gap-2">
+                <ShieldCheck className="w-4 h-4 text-indigo-600" />
+                Lifecycle & Deployment State
+              </h3>
+              <p className="text-xs text-slate-500 mt-0.5">
+                Review runtime versioning, deployment status, and exposure in discovery catalogs.
+              </p>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <div className="p-4 rounded-xl bg-slate-50 border border-slate-200/80">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-1">Status</span>
+                <span className="text-sm font-bold text-slate-900 uppercase font-mono">{agent.status}</span>
+              </div>
+              <div className="p-4 rounded-xl bg-slate-50 border border-slate-200/80">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-1">Release Version</span>
+                <span className="text-sm font-bold text-indigo-600 font-mono">v{agent.current_version || '1.0'}</span>
+              </div>
+              <div className="p-4 rounded-xl bg-slate-50 border border-slate-200/80">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-1">Catalog Listing</span>
+                <span className="text-sm font-bold text-slate-900">{agent.is_public ? 'Public Discovery' : 'Private Studio'}</span>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-3 pt-3 border-t border-slate-100">
+              {agent.status === 'published' && (
+                <button
+                  type="button"
+                  onClick={handleUnpublish}
+                  disabled={isSaving}
+                  className="px-4 py-2 rounded-xl text-xs font-semibold text-rose-700 bg-rose-50 border border-rose-200 hover:bg-rose-100 transition-colors"
+                >
+                  Unpublish from Live
+                </button>
+              )}
+
+              <button
+                type="button"
+                onClick={() => setShowShareModal(true)}
+                className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-semibold text-slate-700 bg-white border border-slate-200 hover:bg-slate-50 transition-colors"
+              >
+                <Share2 className="w-3.5 h-3.5" />
+                <span>Share Embed & Direct Link</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Configure Tool Modal */}
       {activeConfigureTool && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs animate-in fade-in">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-xs animate-in fade-in">
           <div className="bg-white rounded-2xl border border-slate-200 shadow-xl max-w-md w-full overflow-hidden flex flex-col max-h-[80vh]">
             <div className="p-4 px-6 border-b border-slate-100 flex items-center justify-between">
               <div>
                 <h3 className="text-sm font-bold text-slate-900">{activeConfigureTool.name}</h3>
-                <span className="text-[11px] text-slate-500">Tool Options & Schema</span>
+                <span className="text-[11px] text-slate-500">Schema & Tool Specification</span>
               </div>
               <button
                 onClick={() => setActiveConfigureTool(null)}
@@ -1203,7 +1155,7 @@ export const AgentForm: React.FC<AgentFormProps> = ({
                   className={`px-3 py-1.5 rounded-xl text-xs font-semibold ${
                     (agent.enabled_tools || []).includes(activeConfigureTool.id)
                       ? 'bg-rose-50 text-rose-700 border border-rose-200 hover:bg-rose-100'
-                      : 'bg-blue-600 text-white hover:bg-blue-700'
+                      : 'bg-indigo-600 text-white hover:bg-indigo-700'
                   }`}
                 >
                   {(agent.enabled_tools || []).includes(activeConfigureTool.id) ? 'Disable on Agent' : 'Enable on Agent'}
@@ -1223,14 +1175,14 @@ export const AgentForm: React.FC<AgentFormProps> = ({
         </div>
       )}
 
-      {/* Test Tool Modal */}
+      {/* Sandbox Test Tool Modal */}
       {activeTestTool && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs animate-in fade-in">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-xs animate-in fade-in">
           <div className="bg-white rounded-2xl border border-slate-200 shadow-xl max-w-xl w-full overflow-hidden flex flex-col max-h-[85vh]">
             <div className="p-4 px-6 border-b border-slate-100 flex items-center justify-between">
               <div>
-                <h3 className="text-sm font-bold text-slate-900">Test {activeTestTool.name}</h3>
-                <span className="text-[11px] text-slate-500">Run sandbox test</span>
+                <h3 className="text-sm font-bold text-slate-900">Sandbox: {activeTestTool.name}</h3>
+                <span className="text-[11px] text-slate-500">Live capability verification bench</span>
               </div>
               <button
                 onClick={() => setActiveTestTool(null)}
@@ -1303,16 +1255,16 @@ export const AgentForm: React.FC<AgentFormProps> = ({
                   <div className="flex items-center justify-between text-xs">
                     <span className="font-bold text-slate-800">Result ({testResult.execution_time_ms}ms)</span>
                     <span className={`font-semibold ${testResult.success ? 'text-emerald-600' : 'text-rose-600'}`}>
-                      {testResult.success ? 'Success' : 'Failed'}
+                      {testResult.success ? 'Success' : 'Execution Failed'}
                     </span>
                   </div>
                   {testResult.output_preview && (
-                    <p className="text-xs text-slate-700 bg-slate-50 p-2 rounded-lg border border-slate-200 font-mono">
+                    <p className="text-xs text-slate-700 bg-slate-50 p-2.5 rounded-xl border border-slate-200 font-mono">
                       {testResult.output_preview}
                     </p>
                   )}
                   {testResult.error && (
-                    <p className="text-xs text-rose-700 bg-rose-50 p-2 rounded-lg border border-rose-200 font-mono">
+                    <p className="text-xs text-rose-700 bg-rose-50 p-2.5 rounded-xl border border-rose-200 font-mono">
                       {testResult.error}
                     </p>
                   )}
@@ -1343,23 +1295,23 @@ export const AgentForm: React.FC<AgentFormProps> = ({
                       success: false,
                       tool_id: activeTestTool.id,
                       error: err.message,
-                      execution_time_ms: 0
+                      execution_time_ms: 0,
                     });
                   } finally {
                     setIsExecutingTest(false);
                   }
                 }}
-                className="px-4 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold flex items-center gap-1.5 shadow-xs"
+                className="px-4 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold flex items-center gap-1.5 shadow-xs"
               >
                 {isExecutingTest ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Play className="w-3 h-3 fill-white" />}
-                <span>Execute Test</span>
+                <span>Execute Sandbox Test</span>
               </button>
             </div>
           </div>
         </div>
       )}
 
-      {/* Prompt Builder Modal */}
+      {/* Prompt Builder AI Modal */}
       <PromptBuilderModal
         isOpen={showPromptBuilder}
         onClose={() => setShowPromptBuilder(false)}
