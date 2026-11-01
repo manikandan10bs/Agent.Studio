@@ -48,6 +48,7 @@ export const StudioPage: React.FC = () => {
   // Fleet view search & filters
   const [activeTab, setActiveTab] = useState<'created' | 'shared'>('created');
   const [draftSearchQuery, setDraftSearchQuery] = useState('');
+  const [fleetFilter, setFleetFilter] = useState<'all' | 'published' | 'draft'>('all');
 
   // Dashboard view state
   const [dashboardSearchQuery, setDashboardSearchQuery] = useState('');
@@ -420,7 +421,6 @@ export const StudioPage: React.FC = () => {
   }
 
   // 2. AGENT SECTION: Shows Agent Studio Fleet Workspace or Agent Studio Editor
-  const [fleetFilter, setFleetFilter] = useState<'all' | 'published' | 'draft'>('all');
   const filteredAgentsList = agents.filter((ag) => {
     const matchesSearch =
       ag.name.toLowerCase().includes(draftSearchQuery.toLowerCase()) ||
