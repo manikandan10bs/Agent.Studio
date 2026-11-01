@@ -4,7 +4,8 @@ from sqlalchemy.orm import Session
 from app.db.session import get_db
 from app.core.security import verify_password, create_access_token, get_password_hash, hash_invitation_token
 from app.models.user import User, UserInvitation, UserQuota
-from app.schemas.auth import LoginRequest, Token, UserResponse, AcceptInvitationRequest
+from app.schemas.auth import LoginRequest, RegisterRequest, Token, UserResponse, AcceptInvitationRequest
+from app.core.config import settings
 from app.api.deps import get_current_user, log_audit
 
 router = APIRouter()
@@ -41,6 +42,61 @@ def login(
     )
 
     log_audit(db, "LOGIN_SUCCESS", "user", str(user.id), user=user, ip_address=request.client.host if request.client else None)
+
+    return {
+        "access_token": access_token,
+        "token_type": "bearer",
+        "user": user
+    }
+
+@router.post("/register", response_model=Token)
+def register(
+    register_data: RegisterRequest,
+    response: Response,
+    request: Request,
+    db: Session = Depends(get_db)
+):
+    email_clean = register_data.email.lower().strip()
+    existing = db.query(User).filter(User.email == email_clean).first()
+    if existing:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="An account with this email already exists. Please sign in instead."
+        )
+
+    admin_emails = {
+        "manikandan10bs@gmail.com",
+        "admin@agent.studio",
+        settings.DEFAULT_ADMIN_EMAIL.lower()
+    }
+    role = "admin" if email_clean in admin_emails else "creator"
+
+    user = User(
+        email=email_clean,
+        full_name=register_data.full_name or email_clean.split("@")[0].title(),
+        hashed_password=get_password_hash(register_data.password),
+        role=role,
+        is_active=True
+    )
+    db.add(user)
+    db.flush()
+
+    quota = UserQuota(user_id=user.id)
+    db.add(quota)
+    db.commit()
+    db.refresh(user)
+
+    access_token = create_access_token(subject=user.id)
+    response.set_cookie(
+        key="agent_studio_token",
+        value=access_token,
+        httponly=True,
+        max_age=60 * 60 * 24,
+        samesite="lax",
+        secure=False
+    )
+
+    log_audit(db, "REGISTER_SUCCESS", "user", str(user.id), user=user, ip_address=request.client.host if request.client else None)
 
     return {
         "access_token": access_token,

@@ -50,6 +50,8 @@ export const LoginPage: React.FC = () => {
         msg = 'Password should be at least 6 characters.';
       } else if (err.code === 'auth/invalid-credential' || err.code === 'auth/wrong-password') {
         msg = 'Invalid email or password.';
+      } else if (err.code === 'auth/network-request-failed' || msg.includes('network-request-failed')) {
+        msg = 'Network error communicating with authentication service. Please check your connection or use Email & Password.';
       }
       setError(msg);
     } finally {

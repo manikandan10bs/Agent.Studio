@@ -79,27 +79,38 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }, 2500);
 
     if (isFirebaseActive && auth) {
-      const unsubscribe = onAuthStateChanged(auth, async (fbUser: FirebaseUser | null) => {
-        if (!initialLoadDone) {
-          initialLoadDone = true;
-          clearTimeout(timeoutId);
-        }
-
-        if (fbUser) {
-          try {
-            const token = await fbUser.getIdToken();
-            await syncBackendUser(token);
-          } catch (err) {
-            console.warn('Failed to sync Firebase session with backend:', err);
-            await refreshUser();
-          } finally {
-            setLoading(false);
+      const unsubscribe = onAuthStateChanged(
+        auth,
+        async (fbUser: FirebaseUser | null) => {
+          if (!initialLoadDone) {
+            initialLoadDone = true;
+            clearTimeout(timeoutId);
           }
-        } else {
-          // If no Firebase user, check if a local JWT exists or clear
-          await refreshUser();
+
+          if (fbUser) {
+            try {
+              const token = await fbUser.getIdToken();
+              await syncBackendUser(token);
+            } catch (err) {
+              console.warn('Failed to sync Firebase session with backend:', err);
+              await refreshUser();
+            } finally {
+              setLoading(false);
+            }
+          } else {
+            // If no Firebase user, check if a local JWT exists or clear
+            await refreshUser();
+          }
+        },
+        (error) => {
+          console.warn('Firebase auth state listener error:', error);
+          if (!initialLoadDone) {
+            initialLoadDone = true;
+            clearTimeout(timeoutId);
+            refreshUser();
+          }
         }
-      });
+      );
 
       return () => {
         clearTimeout(timeoutId);
@@ -119,17 +130,21 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         await syncBackendUser(token);
         return;
       } catch (err: any) {
-        // If user doesn't exist in Firebase or if fallback allowed, try backend directly
-        if (err.code === 'auth/user-not-found' || err.code === 'auth/invalid-credential') {
-          try {
-            const data = await api.login(email, password);
-            setUser(data.user);
-            return;
-          } catch {
-            throw err;
+        console.warn('Firebase login attempt failed, trying backend direct fallback:', err?.code || err?.message);
+        // Seamless fallback to backend authentication directly
+        try {
+          const data = await api.login(email, password);
+          setUser(data.user);
+          return;
+        } catch (backendErr: any) {
+          if (backendErr?.message && !backendErr.message.includes('Failed to fetch')) {
+            throw backendErr;
           }
+          if (err.code === 'auth/network-request-failed') {
+            throw new Error('Authentication network request failed. Please check your internet connection.');
+          }
+          throw err;
         }
-        throw err;
       }
     }
 
@@ -149,15 +164,34 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const registerWithEmail = async (email: string, password: string, displayName?: string) => {
     if (isFirebaseActive && auth) {
-      const cred = await createUserWithEmailAndPassword(auth, email, password);
-      if (displayName && cred.user) {
-        await updateProfile(cred.user, { displayName });
+      try {
+        const cred = await createUserWithEmailAndPassword(auth, email, password);
+        if (displayName && cred.user) {
+          await updateProfile(cred.user, { displayName });
+        }
+        const token = await cred.user.getIdToken(true);
+        await syncBackendUser(token);
+        return;
+      } catch (err: any) {
+        console.warn('Firebase registration failed, trying backend direct fallback:', err?.code || err?.message);
+        try {
+          const data = await api.register(email, password, displayName);
+          setUser(data.user);
+          return;
+        } catch (backendErr: any) {
+          if (backendErr?.message && !backendErr.message.includes('Failed to fetch')) {
+            throw backendErr;
+          }
+          if (err.code === 'auth/network-request-failed') {
+            throw new Error('Authentication network request failed. Please check your internet connection.');
+          }
+          throw err;
+        }
       }
-      const token = await cred.user.getIdToken(true);
-      await syncBackendUser(token);
-      return;
     }
-    throw new Error('User registration requires Firebase to be enabled.');
+
+    const data = await api.register(email, password, displayName);
+    setUser(data.user);
   };
 
   const resetPassword = async (email: string) => {

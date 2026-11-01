@@ -334,6 +334,32 @@ app.post('/api/auth/login', async (c) => {
   });
 });
 
+app.post('/api/auth/register', async (c) => {
+  const body = await c.req.json().catch(() => ({}));
+  const email = (body.email || '').trim().toLowerCase();
+  if (!email) {
+    return c.json({ detail: 'Email is required' }, 400);
+  }
+  let user = users.find((u) => u.email.toLowerCase() === email);
+  if (!user) {
+    const adminEmails = ['manikandan10bs@gmail.com', 'admin@agent.studio'];
+    user = {
+      id: users.length + 1,
+      email,
+      full_name: body.full_name || email.split('@')[0],
+      role: adminEmails.includes(email) ? 'admin' : 'creator',
+      is_active: true,
+      created_at: new Date().toISOString(),
+    };
+    users.push(user);
+  }
+  return c.json({
+    access_token: `cf_token_${Date.now()}_${user.id}`,
+    token_type: 'bearer',
+    user,
+  });
+});
+
 app.post('/api/auth/logout', (c) => c.json({ message: 'Successfully logged out' }));
 
 app.get('/api/auth/invitation-info', (c) => {

@@ -14,6 +14,11 @@ class LoginRequest(BaseModel):
     email: EmailStr
     password: str
 
+class RegisterRequest(BaseModel):
+    email: EmailStr
+    password: str
+    full_name: Optional[str] = None
+
 class AcceptInvitationRequest(BaseModel):
     token: str
     password: str

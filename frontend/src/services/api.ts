@@ -66,6 +66,17 @@ export const api = {
     return data;
   },
 
+  async register(email: string, password: string, fullName?: string): Promise<{ access_token: string; user: User }> {
+    const res = await fetch(`${API_BASE}/auth/register`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, password, full_name: fullName }),
+    });
+    const data = await handleResponse<{ access_token: string; user: User }>(res);
+    localStorage.setItem('agent_studio_token', data.access_token);
+    return data;
+  },
+
   async logout(): Promise<void> {
     try {
       await fetch(`${API_BASE}/auth/logout`, { method: 'POST', headers: getHeaders() });
