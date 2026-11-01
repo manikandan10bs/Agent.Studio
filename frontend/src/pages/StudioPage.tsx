@@ -441,23 +441,42 @@ export const StudioPage: React.FC = () => {
     return (
       <StudioLayout>
         <div className="flex flex-col h-full w-full overflow-y-auto pr-1 space-y-6">
-          {/* Top Hero Header */}
+          {/* Top Hero Header with Agent Creation Lobby Emblem */}
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-slate-200">
-            <div>
-              <div className="flex items-center gap-2 mb-1">
-                <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-indigo-50 border border-indigo-200 text-indigo-700">
-                  Agent Platform
-                </span>
-                <span className="text-[10px] font-medium text-slate-500">
-                  {agents.length} active agent{agents.length === 1 ? '' : 's'}
-                </span>
+            <div className="flex items-center gap-3.5">
+              <div className="w-11 h-11 rounded-2xl bg-gradient-to-tr from-indigo-600 via-violet-600 to-cyan-400 p-0.5 shadow-md shadow-indigo-500/20 flex-shrink-0">
+                <div className="w-full h-full rounded-[14px] bg-[#0A0E17] flex items-center justify-center p-1.5">
+                  <svg viewBox="0 0 24 24" fill="none" className="w-full h-full">
+                    <path d="M12 3L20 7.5V16.5L12 21L4 16.5V7.5L12 3Z" stroke="url(#lobby-prism-grad)" strokeWidth="2" strokeLinejoin="round" />
+                    <path d="M12 8L16 12L12 16L8 12L12 8Z" fill="url(#lobby-prism-grad)" fillOpacity="0.8" />
+                    <circle cx="12" cy="12" r="1.5" fill="#FFFFFF" />
+                    <defs>
+                      <linearGradient id="lobby-prism-grad" x1="4" y1="3" x2="20" y2="21" gradientUnits="userSpaceOnUse">
+                        <stop stopColor="#6366F1" />
+                        <stop offset="0.5" stopColor="#8B5CF6" />
+                        <stop offset="1" stopColor="#06B6D4" />
+                      </linearGradient>
+                    </defs>
+                  </svg>
+                </div>
               </div>
-              <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight">
-                Agent Studio Fleet
-              </h1>
-              <p className="text-xs sm:text-sm text-slate-500 mt-0.5">
-                Design, ground with vector document intelligence, and deploy autonomous agents.
-              </p>
+
+              <div>
+                <div className="flex items-center gap-2 mb-0.5">
+                  <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-indigo-50 border border-indigo-200 text-indigo-700">
+                    Agent Creation Lobby
+                  </span>
+                  <span className="text-[10px] font-medium text-slate-500">
+                    {agents.length} active agent{agents.length === 1 ? '' : 's'}
+                  </span>
+                </div>
+                <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight">
+                  Agent Studio Fleet
+                </h1>
+                <p className="text-xs sm:text-sm text-slate-500 mt-0.5">
+                  Design, ground with vector document intelligence, and deploy autonomous agents.
+                </p>
+              </div>
             </div>
 
             <div className="flex items-center gap-2.5">

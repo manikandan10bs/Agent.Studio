@@ -163,6 +163,7 @@ export const AdminDashboard: React.FC = () => {
       setNewEmail('');
       setNewName('');
       setNewPassword('');
+      setNewRole('creator');
       loadAllAdminData();
       alert('User created successfully');
     } catch (err: any) {
@@ -602,6 +603,19 @@ export const AdminDashboard: React.FC = () => {
                       placeholder="••••••••••••"
                       className="w-full rounded-xl bg-slate-50 border border-slate-200 px-3.5 py-2 text-xs text-slate-900 placeholder-slate-400 focus:outline-none focus:border-blue-500"
                     />
+                  </div>
+                  <div>
+                    <label className="text-xs font-semibold text-slate-700 block mb-1">
+                      Assigned Role
+                    </label>
+                    <select
+                      value={newRole}
+                      onChange={(e) => setNewRole(e.target.value)}
+                      className="w-full rounded-xl bg-slate-50 border border-slate-200 px-3.5 py-2 text-xs text-slate-900 focus:outline-none focus:border-blue-500 font-medium"
+                    >
+                      <option value="creator">Creator (Can build & publish private agents)</option>
+                      <option value="admin">Administrator (Full platform permissions)</option>
+                    </select>
                   </div>
                   <button
                     type="submit"

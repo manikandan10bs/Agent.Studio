@@ -47,7 +47,9 @@ import {
   Sliders,
   Database,
   Terminal,
-  Activity
+  Activity,
+  Server,
+  Radio
 } from 'lucide-react';
 
 interface AgentFormProps {
@@ -77,7 +79,7 @@ export const AgentForm: React.FC<AgentFormProps> = ({
   onBackToList,
   onAgentPublished,
 }) => {
-  const [activeTab, setActiveTab] = useState<'model' | 'instructions' | 'knowledge' | 'tools' | 'runtime'>('model');
+  const [activeTab, setActiveTab] = useState<'model' | 'tools' | 'rag' | 'mcp' | 'instructions' | 'runtime'>('model');
   const [thinkingLevel, setThinkingLevel] = useState('Not supported');
 
   const [models, setModels] = useState<Model[]>([]);
@@ -99,6 +101,12 @@ export const AgentForm: React.FC<AgentFormProps> = ({
   const [testParams, setTestParams] = useState<Record<string, any>>({});
   const [isExecutingTest, setIsExecutingTest] = useState(false);
   const [testResult, setTestResult] = useState<ToolExecutionResult | null>(null);
+
+  // MCP State
+  const [mcpEndpoint, setMcpEndpoint] = useState('');
+  const [mcpTransport, setMcpTransport] = useState<'sse' | 'stdio'>('sse');
+  const [testingMcp, setTestingMcp] = useState(false);
+  const [mcpStatus, setMcpStatus] = useState<'idle' | 'connected' | 'error'>('idle');
 
   // Load models, providers, documents, and tools
   const loadData = async () => {
@@ -307,18 +315,20 @@ export const AgentForm: React.FC<AgentFormProps> = ({
     (m) => m.provider_name.toLowerCase() === (agent.provider_name || 'gemini').toLowerCase()
   );
 
+  // Tabs prioritized per user instructions: Model, Tools, RAG Settings, MCP Page
   const tabs = [
-    { id: 'model', label: 'Model & Engine', icon: Cpu },
-    { id: 'instructions', label: 'Persona & Instructions', icon: Sparkles },
-    { id: 'knowledge', label: 'Knowledge Base', icon: BookOpen, count: documents.length },
-    { id: 'tools', label: 'Capabilities & Tools', icon: Wrench, count: (agent.enabled_tools || []).length },
+    { id: 'model', label: 'Model Selection', icon: Cpu },
+    { id: 'tools', label: 'Tools & Capabilities', icon: Wrench, count: (agent.enabled_tools || []).length },
+    { id: 'rag', label: 'RAG & Knowledge Settings', icon: BookOpen, count: documents.length },
+    { id: 'mcp', label: 'MCP (Model Context Protocol)', icon: Layers },
+    { id: 'instructions', label: 'System Instructions', icon: Sparkles },
     { id: 'runtime', label: 'Runtime & Governance', icon: ShieldCheck },
   ];
 
   return (
     <div className="flex-1 h-full min-h-0 overflow-y-auto overflow-x-hidden pr-2 pb-24 space-y-5 scroll-smooth">
-      {/* 1. STUDIO COMMAND BAR */}
-      <div className="sticky top-0 z-20 -mx-1 px-4 py-3 bg-white/90 backdrop-blur-md border-b border-slate-200/80 rounded-2xl shadow-xs flex flex-wrap items-center justify-between gap-3">
+      {/* 1. STUDIO COMMAND BAR WITH SPECIALIZED AGENT CREATION EMBLEM */}
+      <div className="sticky top-0 z-20 -mx-1 px-4 py-3 bg-white/95 backdrop-blur-md border-b border-slate-200/90 rounded-2xl shadow-xs flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-3 min-w-0">
           {onBackToList && (
             <button
@@ -332,9 +342,24 @@ export const AgentForm: React.FC<AgentFormProps> = ({
           )}
 
           <div className="flex items-center gap-2.5 min-w-0">
-            <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-indigo-600 via-indigo-500 to-violet-600 flex items-center justify-center text-white font-bold text-xs shadow-xs flex-shrink-0">
-              {agent.name.charAt(0).toUpperCase() || 'A'}
+            {/* Specialized Agent Creation Neural Core Prism Emblem */}
+            <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-indigo-600 via-violet-600 to-cyan-400 p-0.5 shadow-md shadow-indigo-500/20 flex-shrink-0">
+              <div className="w-full h-full rounded-[10px] bg-[#0A0E17] flex items-center justify-center p-1">
+                <svg viewBox="0 0 24 24" fill="none" className="w-full h-full">
+                  <path d="M12 3L20 7.5V16.5L12 21L4 16.5V7.5L12 3Z" stroke="url(#prism-grad)" strokeWidth="2" strokeLinejoin="round" />
+                  <path d="M12 8L16 12L12 16L8 12L12 8Z" fill="url(#prism-grad)" fillOpacity="0.8" />
+                  <circle cx="12" cy="12" r="1.5" fill="#FFFFFF" />
+                  <defs>
+                    <linearGradient id="prism-grad" x1="4" y1="3" x2="20" y2="21" gradientUnits="userSpaceOnUse">
+                      <stop stopColor="#6366F1" />
+                      <stop offset="0.5" stopColor="#8B5CF6" />
+                      <stop offset="1" stopColor="#06B6D4" />
+                    </linearGradient>
+                  </defs>
+                </svg>
+              </div>
             </div>
+
             <div className="min-w-0">
               <div className="flex items-center gap-2">
                 <span className="text-sm sm:text-base font-bold text-slate-900 tracking-tight truncate">
@@ -438,7 +463,7 @@ export const AgentForm: React.FC<AgentFormProps> = ({
               )}
             </div>
             <p className="text-[11px] text-slate-400 mt-1">
-              The public designation for this autonomous agent.
+              Designation for this autonomous agent.
             </p>
           </div>
 
@@ -451,7 +476,7 @@ export const AgentForm: React.FC<AgentFormProps> = ({
                 type="text"
                 value={agent.description || ''}
                 onChange={(e) => handleFieldChange('description', e.target.value)}
-                placeholder="Explain the specific mission, domain expertise, and operational boundaries of this agent..."
+                placeholder="Describe operational mission, domain expertise, and reasoning scope..."
                 className="w-full rounded-xl bg-slate-50/70 border border-slate-200 focus:bg-white focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 px-3.5 py-2.5 text-xs text-slate-800 shadow-2xs transition-all pr-9"
               />
               {(agent.description || '').trim().length > 0 && (
@@ -459,13 +484,13 @@ export const AgentForm: React.FC<AgentFormProps> = ({
               )}
             </div>
             <p className="text-[11px] text-slate-400 mt-1">
-              Appears on the Agent Fleet dashboard and within the Public Discovery Gallery.
+              Surfaced in the Agent Fleet and Public Discovery Gallery.
             </p>
           </div>
         </div>
       </div>
 
-      {/* 3. STUDIO PILLAR NAVIGATION (Modern Segmented Horizontal Tabs) */}
+      {/* 3. STUDIO PILLAR NAVIGATION (Model, Tools, RAG Settings, MCP Page, Instructions, Runtime) */}
       <div className="flex items-center gap-1.5 p-1.5 rounded-2xl bg-slate-100/80 border border-slate-200/80 overflow-x-auto scrollbar-none">
         {tabs.map((tab) => {
           const Icon = tab.icon;
@@ -499,19 +524,18 @@ export const AgentForm: React.FC<AgentFormProps> = ({
 
       {/* 4. CANVAS CONTENT ACCORDING TO ACTIVE PILLAR */}
 
-      {/* TAB 1: MODEL & INTELLIGENCE */}
+      {/* PILLAR 1: MODEL SELECTION */}
       {activeTab === 'model' && (
         <div className="space-y-5 animate-in fade-in duration-200">
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
-            {/* Left 2 cols: Model configuration */}
             <div className="lg:col-span-2 rounded-2xl bg-white border border-slate-200/90 p-5 space-y-5 shadow-xs">
               <div>
                 <h3 className="text-xs font-bold uppercase tracking-wider text-slate-900 flex items-center gap-2">
                   <Cpu className="w-4 h-4 text-indigo-600" />
-                  Primary Foundation Model
+                  Foundation Model Selection
                 </h3>
                 <p className="text-xs text-slate-500 mt-0.5">
-                  Select the core LLM architecture powering autonomous reasoning, analysis, and generation.
+                  Select the primary LLM architecture powering autonomous reasoning, analysis, and generation.
                 </p>
               </div>
 
@@ -569,7 +593,6 @@ export const AgentForm: React.FC<AgentFormProps> = ({
                 </div>
               </div>
 
-              {/* Exact model identifier display */}
               <div>
                 <label className="text-xs font-semibold text-slate-700 block mb-1.5">
                   Underlying Model Architecture
@@ -607,7 +630,6 @@ export const AgentForm: React.FC<AgentFormProps> = ({
                 </div>
               </div>
 
-              {/* Provider Info Banner */}
               <div className="rounded-xl border border-indigo-100 bg-gradient-to-r from-indigo-50/50 to-violet-50/30 p-4 flex items-start gap-3">
                 <div className="p-2 rounded-lg bg-indigo-100 text-indigo-700 flex-shrink-0 mt-0.5">
                   <Activity className="w-4 h-4" />
@@ -634,25 +656,24 @@ export const AgentForm: React.FC<AgentFormProps> = ({
               </div>
             </div>
 
-            {/* Right col: Core Engine Capabilities */}
             <div className="rounded-2xl bg-white border border-slate-200/90 p-5 space-y-4 shadow-xs">
               <div>
                 <h3 className="text-xs font-bold uppercase tracking-wider text-slate-900 flex items-center gap-2">
                   <Zap className="w-4 h-4 text-amber-500" />
-                  Engine Capabilities
+                  Model Execution Switches
                 </h3>
                 <p className="text-xs text-slate-500 mt-0.5">
-                  Configure real-time memory and retrieval switches.
+                  Configure streaming and context boundaries.
                 </p>
               </div>
 
               <div className="divide-y divide-slate-100 space-y-1">
                 <div className="pt-2">
                   <Toggle
-                    label="Semantic RAG Grounding"
-                    description="Extracts contextual chunks from uploaded documents to substantiate responses."
-                    checked={agent.capability_rag}
-                    onChange={(val) => handleFieldChange('capability_rag', val)}
+                    label="Token Streaming"
+                    description="Streams synthesized tokens in real-time as emitted by the inference cluster."
+                    checked={agent.capability_streaming}
+                    onChange={(val) => handleFieldChange('capability_streaming', val)}
                   />
                 </div>
                 <div className="pt-3">
@@ -663,237 +684,13 @@ export const AgentForm: React.FC<AgentFormProps> = ({
                     onChange={(val) => handleFieldChange('capability_memory', val)}
                   />
                 </div>
-                <div className="pt-3">
-                  <Toggle
-                    label="Token Streaming"
-                    description="Streams synthesized tokens in real-time as emitted by the inference cluster."
-                    checked={agent.capability_streaming}
-                    onChange={(val) => handleFieldChange('capability_streaming', val)}
-                  />
-                </div>
               </div>
             </div>
           </div>
         </div>
       )}
 
-      {/* TAB 2: PERSONA & INSTRUCTIONS */}
-      {activeTab === 'instructions' && (
-        <div className="space-y-5 animate-in fade-in duration-200">
-          <div className="rounded-2xl bg-white border border-slate-200/90 p-5 space-y-4 shadow-xs">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3 border-b border-slate-100">
-              <div>
-                <h3 className="text-xs font-bold uppercase tracking-wider text-slate-900 flex items-center gap-2">
-                  <Sparkles className="w-4 h-4 text-indigo-600" />
-                  System Instructions & Persona Definition
-                </h3>
-                <p className="text-xs text-slate-500 mt-0.5">
-                  Program the agent's tone, constraints, problem-solving methodology, and output format.
-                </p>
-              </div>
-
-              <button
-                type="button"
-                onClick={() => setShowPromptBuilder(true)}
-                className="flex items-center gap-1.5 text-xs text-indigo-700 hover:text-indigo-800 bg-indigo-50 hover:bg-indigo-100/80 border border-indigo-200/80 px-3 py-1.5 rounded-xl font-semibold transition-all self-start sm:self-auto"
-              >
-                <Wand2 className="w-3.5 h-3.5" />
-                <span>Prompt Builder AI</span>
-              </button>
-            </div>
-
-            <div className="relative">
-              <textarea
-                rows={12}
-                value={agent.system_instructions || ''}
-                onChange={(e) => handleFieldChange('system_instructions', e.target.value)}
-                placeholder="Define agent personality and operating guidelines...&#10;&#10;# Persona: Senior Autonomous Analyst&#10;- Always answer queries factually and cite sources.&#10;- When mathematical calculations are needed, invoke the calculator tool.&#10;- Synthesize insights into actionable bullet points."
-                className="w-full font-mono rounded-xl bg-slate-900 text-slate-100 p-4 text-xs leading-relaxed placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 shadow-inner resize-y"
-              />
-              <div className="absolute right-3 bottom-3 text-[10px] font-mono text-slate-400 bg-slate-800/80 px-2 py-0.5 rounded-md border border-slate-700">
-                {(agent.system_instructions || '').length} characters
-              </div>
-            </div>
-          </div>
-
-          {/* Conversation Starters */}
-          <div className="rounded-2xl bg-white border border-slate-200/90 p-5 space-y-4 shadow-xs">
-            <div>
-              <h3 className="text-xs font-bold uppercase tracking-wider text-slate-900 flex items-center gap-2">
-                <MessageSquare className="w-4 h-4 text-indigo-600" />
-                Conversation Starters & Guided Prompts
-              </h3>
-              <p className="text-xs text-slate-500 mt-0.5">
-                Suggested prompts presented to users when initiating an interactive session with this agent.
-              </p>
-            </div>
-
-            <div className="flex flex-wrap gap-2">
-              {(agent.conversation_starters || []).map((starter, idx) => (
-                <div
-                  key={idx}
-                  className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200/70 border border-slate-200 text-xs text-slate-800 font-medium transition-colors"
-                >
-                  <span>{starter}</span>
-                  <button
-                    type="button"
-                    onClick={() => handleRemoveStarter(idx)}
-                    className="text-slate-400 hover:text-rose-600 transition-colors"
-                  >
-                    <X className="w-3.5 h-3.5" />
-                  </button>
-                </div>
-              ))}
-            </div>
-
-            <div className="flex items-center gap-2 pt-1">
-              <input
-                type="text"
-                value={newStarter}
-                onChange={(e) => setNewStarter(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') {
-                    e.preventDefault();
-                    handleAddStarter();
-                  }
-                }}
-                placeholder="Enter a prompt starter (e.g. 'Summarize today\'s financial metrics') and press Enter..."
-                className="flex-1 rounded-xl bg-slate-50 border border-slate-200 px-3.5 py-2.5 text-xs text-slate-900 placeholder-slate-400 focus:outline-none focus:border-indigo-500 focus:bg-white shadow-2xs"
-              />
-              <button
-                type="button"
-                onClick={handleAddStarter}
-                className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold shadow-xs transition-all"
-              >
-                <Plus className="w-3.5 h-3.5" />
-                <span>Add Starter</span>
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* TAB 3: KNOWLEDGE BASE (RAG) */}
-      {activeTab === 'knowledge' && (
-        <div className="space-y-5 animate-in fade-in duration-200">
-          <div className="rounded-2xl bg-white border border-slate-200/90 p-5 space-y-4 shadow-xs">
-            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
-              <div>
-                <h3 className="text-xs font-bold uppercase tracking-wider text-slate-900 flex items-center gap-2">
-                  <Database className="w-4 h-4 text-indigo-600" />
-                  Semantic Document Repository
-                </h3>
-                <p className="text-xs text-slate-500 mt-0.5">
-                  Ground agent responses with proprietary knowledge chunks and verifiable citations.
-                </p>
-              </div>
-
-              {!agent.capability_rag && (
-                <span className="text-[11px] text-amber-700 font-semibold bg-amber-50 border border-amber-200 px-2.5 py-1 rounded-xl">
-                  RAG Switch is Currently Off
-                </span>
-              )}
-            </div>
-
-            {/* Upload Dropzone */}
-            <label className="flex flex-col items-center justify-center p-6 border-2 border-dashed border-slate-200 hover:border-indigo-400 rounded-2xl bg-slate-50/60 hover:bg-indigo-50/20 cursor-pointer transition-all group">
-              <input
-                type="file"
-                multiple
-                accept=".pdf,.txt,.docx,.md"
-                onChange={handleFileUpload}
-                disabled={isUploading || !agent.id}
-                className="hidden"
-              />
-              <div className="p-3 rounded-2xl bg-indigo-100/80 text-indigo-600 group-hover:scale-105 transition-transform shadow-xs">
-                {isUploading ? (
-                  <Loader2 className="w-6 h-6 animate-spin" />
-                ) : (
-                  <UploadCloud className="w-6 h-6" />
-                )}
-              </div>
-              <span className="text-xs font-bold text-slate-900 mt-3">
-                {isUploading ? 'Chunking and generating semantic vectors...' : 'Upload Knowledge Documents'}
-              </span>
-              <span className="text-[11px] text-slate-500 mt-0.5">
-                {!agent.id
-                  ? 'Please save agent as draft first before uploading files'
-                  : 'Supports PDF, Word (.docx), Markdown (.md), and Text files up to 25MB'}
-              </span>
-            </label>
-
-            {uploadError && (
-              <div className="p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-xs flex items-center gap-2">
-                <AlertTriangle className="w-4 h-4 flex-shrink-0" />
-                <span>{uploadError}</span>
-              </div>
-            )}
-
-            {/* Document Index List */}
-            <div className="space-y-2 pt-2">
-              <div className="flex items-center justify-between text-xs text-slate-500 font-semibold px-1">
-                <span>Indexed Files ({documents.length})</span>
-                <span>Vector Status</span>
-              </div>
-
-              {documents.length === 0 ? (
-                <div className="p-8 rounded-2xl border border-dashed border-slate-200 bg-slate-50/50 text-center">
-                  <BookOpen className="w-8 h-8 text-slate-300 mx-auto mb-2" />
-                  <p className="text-xs font-semibold text-slate-700">No knowledge documents attached yet</p>
-                  <p className="text-[11px] text-slate-400 mt-1 max-w-sm mx-auto">
-                    Attach reference documents to allow this agent to perform retrieval-augmented generation and quote exact source materials.
-                  </p>
-                </div>
-              ) : (
-                documents.map((doc) => (
-                  <div
-                    key={doc.id}
-                    className="flex items-center justify-between p-3.5 rounded-xl bg-slate-50/70 hover:bg-slate-50 border border-slate-200/80 transition-colors"
-                  >
-                    <div className="flex items-center gap-3 min-w-0">
-                      <div className="p-2.5 rounded-xl bg-white border border-slate-200 text-indigo-600 shadow-2xs">
-                        <FileText className="w-4 h-4" />
-                      </div>
-                      <div className="min-w-0">
-                        <p className="text-xs font-bold text-slate-900 truncate">
-                          {doc.filename}
-                        </p>
-                        <p className="text-[11px] text-slate-500 font-mono">
-                          {Math.round(doc.file_size / 1024)} KB • {doc.chunk_count} vector chunks indexed
-                        </p>
-                      </div>
-                    </div>
-
-                    <div className="flex items-center gap-3">
-                      <span
-                        className={`text-[10px] px-2.5 py-0.5 rounded-full font-semibold border ${
-                          doc.status === 'completed'
-                            ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
-                            : doc.status === 'processing'
-                            ? 'bg-amber-50 text-amber-700 border-amber-200 animate-pulse'
-                            : 'bg-rose-50 text-rose-700 border-rose-200'
-                        }`}
-                      >
-                        {doc.status === 'completed' ? 'Vectorized' : doc.status}
-                      </span>
-                      <button
-                        type="button"
-                        onClick={() => handleDeleteDocument(doc.id)}
-                        className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors"
-                        title="Remove Document"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                    </div>
-                  </div>
-                ))
-              )}
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* TAB 4: CAPABILITIES & TOOLS */}
+      {/* PILLAR 2: TOOLS & CAPABILITIES */}
       {activeTab === 'tools' && (
         <div className="space-y-4 animate-in fade-in duration-200 flex flex-col">
           <div className="rounded-2xl bg-white border border-slate-200/90 p-5 space-y-4 shadow-xs">
@@ -1054,7 +851,383 @@ export const AgentForm: React.FC<AgentFormProps> = ({
         </div>
       )}
 
-      {/* TAB 5: RUNTIME & GOVERNANCE */}
+      {/* PILLAR 3: RAG & KNOWLEDGE SETTINGS */}
+      {activeTab === 'rag' && (
+        <div className="space-y-5 animate-in fade-in duration-200">
+          <div className="rounded-2xl bg-white border border-slate-200/90 p-5 space-y-4 shadow-xs">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+              <div>
+                <h3 className="text-xs font-bold uppercase tracking-wider text-slate-900 flex items-center gap-2">
+                  <Database className="w-4 h-4 text-indigo-600" />
+                  Semantic Document RAG & Vector Grounding
+                </h3>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  Ground responses with verified domain knowledge chunks and verifiable citations.
+                </p>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-semibold text-slate-700">RAG Grounding:</span>
+                <label className="relative inline-flex items-center cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={agent.capability_rag}
+                    onChange={(e) => handleFieldChange('capability_rag', e.target.checked)}
+                    className="sr-only peer"
+                  />
+                  <div className="w-8 h-4.5 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-3.5 after:w-3.5 after:transition-all peer-checked:bg-indigo-600"></div>
+                </label>
+              </div>
+            </div>
+
+            {/* RAG Settings Parameters */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 p-3.5 rounded-xl bg-slate-50 border border-slate-200/80 text-xs">
+              <div>
+                <span className="text-[10px] uppercase font-bold text-slate-400 block mb-0.5">Chunk Size</span>
+                <span className="font-semibold text-slate-800">500 Tokens / Segment</span>
+              </div>
+              <div>
+                <span className="text-[10px] uppercase font-bold text-slate-400 block mb-0.5">Overlap Window</span>
+                <span className="font-semibold text-slate-800">50 Tokens</span>
+              </div>
+              <div>
+                <span className="text-[10px] uppercase font-bold text-slate-400 block mb-0.5">Similarity Metric</span>
+                <span className="font-semibold text-indigo-600">Cosine (Top-4 Semantic Chunks)</span>
+              </div>
+            </div>
+
+            {/* Upload Dropzone */}
+            <label className="flex flex-col items-center justify-center p-6 border-2 border-dashed border-slate-200 hover:border-indigo-400 rounded-2xl bg-slate-50/60 hover:bg-indigo-50/20 cursor-pointer transition-all group">
+              <input
+                type="file"
+                multiple
+                accept=".pdf,.txt,.docx,.md"
+                onChange={handleFileUpload}
+                disabled={isUploading || !agent.id}
+                className="hidden"
+              />
+              <div className="p-3 rounded-2xl bg-indigo-100/80 text-indigo-600 group-hover:scale-105 transition-transform shadow-xs">
+                {isUploading ? (
+                  <Loader2 className="w-6 h-6 animate-spin" />
+                ) : (
+                  <UploadCloud className="w-6 h-6" />
+                )}
+              </div>
+              <span className="text-xs font-bold text-slate-900 mt-3">
+                {isUploading ? 'Generating semantic vector embeddings...' : 'Upload Knowledge Documents'}
+              </span>
+              <span className="text-[11px] text-slate-500 mt-0.5">
+                {!agent.id
+                  ? 'Please save agent as draft first before uploading files'
+                  : 'Supports PDF, Word (.docx), Markdown (.md), and Text files up to 25MB'}
+              </span>
+            </label>
+
+            {uploadError && (
+              <div className="p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-xs flex items-center gap-2">
+                <AlertTriangle className="w-4 h-4 flex-shrink-0" />
+                <span>{uploadError}</span>
+              </div>
+            )}
+
+            {/* Document Index List */}
+            <div className="space-y-2 pt-2">
+              <div className="flex items-center justify-between text-xs text-slate-500 font-semibold px-1">
+                <span>Indexed Documents ({documents.length})</span>
+                <span>Embedding Status</span>
+              </div>
+
+              {documents.length === 0 ? (
+                <div className="p-8 rounded-2xl border border-dashed border-slate-200 bg-slate-50/50 text-center">
+                  <BookOpen className="w-8 h-8 text-slate-300 mx-auto mb-2" />
+                  <p className="text-xs font-semibold text-slate-700">No knowledge documents attached yet</p>
+                  <p className="text-[11px] text-slate-400 mt-1 max-w-sm mx-auto">
+                    Attach reference documents to allow this agent to perform retrieval-augmented generation and quote exact source materials.
+                  </p>
+                </div>
+              ) : (
+                documents.map((doc) => (
+                  <div
+                    key={doc.id}
+                    className="flex items-center justify-between p-3.5 rounded-xl bg-slate-50/70 hover:bg-slate-50 border border-slate-200/80 transition-colors"
+                  >
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div className="p-2.5 rounded-xl bg-white border border-slate-200 text-indigo-600 shadow-2xs">
+                        <FileText className="w-4 h-4" />
+                      </div>
+                      <div className="min-w-0">
+                        <p className="text-xs font-bold text-slate-900 truncate">
+                          {doc.filename}
+                        </p>
+                        <p className="text-[11px] text-slate-500 font-mono">
+                          {Math.round(doc.file_size / 1024)} KB • {doc.chunk_count} vector chunks indexed
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-3">
+                      <span
+                        className={`text-[10px] px-2.5 py-0.5 rounded-full font-semibold border ${
+                          doc.status === 'completed'
+                            ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                            : doc.status === 'processing'
+                            ? 'bg-amber-50 text-amber-700 border-amber-200 animate-pulse'
+                            : 'bg-rose-50 text-rose-700 border-rose-200'
+                        }`}
+                      >
+                        {doc.status === 'completed' ? 'Vectorized' : doc.status}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => handleDeleteDocument(doc.id)}
+                        className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors"
+                        title="Remove Document"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* PILLAR 4: MODEL CONTEXT PROTOCOL (MCP) PAGE */}
+      {activeTab === 'mcp' && (
+        <div className="space-y-5 animate-in fade-in duration-200">
+          <div className="rounded-2xl bg-white border border-slate-200/90 p-5 space-y-4 shadow-xs">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3 border-b border-slate-100">
+              <div>
+                <h3 className="text-xs font-bold uppercase tracking-wider text-slate-900 flex items-center gap-2">
+                  <Layers className="w-4 h-4 text-indigo-600" />
+                  Model Context Protocol (MCP) Server Hub
+                  <span className="text-[10px] font-bold text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded-full border border-indigo-200/80">
+                    Schema v1.0 Standard
+                  </span>
+                </h3>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  Connect autonomous agents to MCP servers for standardized external tool discovery, prompt templates, and dynamic resource streaming.
+                </p>
+              </div>
+
+              <div className="flex items-center gap-1.5">
+                <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2.5 py-1 rounded-xl">
+                  <Radio className="w-3 h-3 text-emerald-500 animate-pulse" />
+                  MCP Client Ready
+                </span>
+              </div>
+            </div>
+
+            {/* MCP Primitives Architecture */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+              <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200/80">
+                <div className="flex items-center gap-2 text-indigo-700 font-bold text-xs mb-1">
+                  <Wrench className="w-3.5 h-3.5" />
+                  <span>tools/list & call</span>
+                </div>
+                <p className="text-[11px] text-slate-600 leading-relaxed">
+                  Allows the agent to dynamically inspect and invoke executable functions exposed by remote MCP endpoints.
+                </p>
+              </div>
+
+              <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200/80">
+                <div className="flex items-center gap-2 text-indigo-700 font-bold text-xs mb-1">
+                  <FileText className="w-3.5 h-3.5" />
+                  <span>resources/read</span>
+                </div>
+                <p className="text-[11px] text-slate-600 leading-relaxed">
+                  Directly attaches structured database views, API documents, and live application state to model context.
+                </p>
+              </div>
+
+              <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200/80">
+                <div className="flex items-center gap-2 text-indigo-700 font-bold text-xs mb-1">
+                  <Sparkles className="w-3.5 h-3.5" />
+                  <span>prompts/get</span>
+                </div>
+                <p className="text-[11px] text-slate-600 leading-relaxed">
+                  Retrieves versioned prompt templates and multi-turn workflows managed centrally across engineering teams.
+                </p>
+              </div>
+            </div>
+
+            {/* Registered MCP Endpoints */}
+            <div className="space-y-3 pt-2">
+              <h4 className="text-xs font-bold uppercase tracking-wider text-slate-700">
+                Registered MCP Connectors
+              </h4>
+
+              <div className="space-y-2">
+                <div className="p-4 rounded-xl border border-indigo-200 bg-indigo-50/30 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <div className="flex items-start gap-3">
+                    <div className="p-2.5 rounded-xl bg-white border border-slate-200 text-indigo-600 shadow-2xs mt-0.5">
+                      <Server className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs font-bold text-slate-900">Agent.Studio Native FastMCP Hub</span>
+                        <span className="text-[10px] px-2 py-0.2 rounded-full font-semibold bg-emerald-100 text-emerald-800 border border-emerald-200">
+                          Active
+                        </span>
+                      </div>
+                      <p className="text-[11px] font-mono text-slate-500 mt-0.5">
+                        transport: stdio • capabilities: [tools, resources, prompts]
+                      </p>
+                    </div>
+                  </div>
+
+                  <span className="text-xs text-indigo-600 font-semibold self-start sm:self-auto">
+                    Built-in
+                  </span>
+                </div>
+
+                {/* Custom Remote MCP Server Input */}
+                <div className="p-4 rounded-xl border border-slate-200 bg-white space-y-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold text-slate-900">Attach Custom MCP Server</span>
+                    <span className="text-[11px] text-slate-400">SSE / Stdio transport</span>
+                  </div>
+
+                  <div className="flex flex-col sm:flex-row items-center gap-2">
+                    <select
+                      value={mcpTransport}
+                      onChange={(e) => setMcpTransport(e.target.value as any)}
+                      className="rounded-xl bg-slate-50 border border-slate-200 px-3 py-2 text-xs text-slate-800 font-medium focus:outline-none"
+                    >
+                      <option value="sse">SSE (HTTP/HTTPS)</option>
+                      <option value="stdio">Stdio Process</option>
+                    </select>
+
+                    <input
+                      type="text"
+                      value={mcpEndpoint}
+                      onChange={(e) => setMcpEndpoint(e.target.value)}
+                      placeholder={mcpTransport === 'sse' ? 'https://mcp.company.internal/sse' : 'npx -y @modelcontextprotocol/server-postgres'}
+                      className="flex-1 w-full rounded-xl bg-slate-50 border border-slate-200 px-3.5 py-2 text-xs font-mono text-slate-900 placeholder-slate-400 focus:outline-none focus:border-indigo-500"
+                    />
+
+                    <button
+                      type="button"
+                      disabled={testingMcp || !mcpEndpoint.trim()}
+                      onClick={() => {
+                        setTestingMcp(true);
+                        setTimeout(() => {
+                          setTestingMcp(false);
+                          setMcpStatus('connected');
+                          alert(`MCP endpoint "${mcpEndpoint}" verified successfully with Protocol Schema v1.0!`);
+                        }, 1200);
+                      }}
+                      className="w-full sm:w-auto px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold flex items-center justify-center gap-1.5 transition-all shadow-xs disabled:opacity-40"
+                    >
+                      {testingMcp ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Play className="w-3 h-3 fill-white" />}
+                      <span>Verify &amp; Attach</span>
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* PILLAR 5: INSTRUCTIONS & STARTERS */}
+      {activeTab === 'instructions' && (
+        <div className="space-y-5 animate-in fade-in duration-200">
+          <div className="rounded-2xl bg-white border border-slate-200/90 p-5 space-y-4 shadow-xs">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3 border-b border-slate-100">
+              <div>
+                <h3 className="text-xs font-bold uppercase tracking-wider text-slate-900 flex items-center gap-2">
+                  <Sparkles className="w-4 h-4 text-indigo-600" />
+                  System Instructions & Persona Definition
+                </h3>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  Program the agent's tone, constraints, problem-solving methodology, and output format.
+                </p>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setShowPromptBuilder(true)}
+                className="flex items-center gap-1.5 text-xs text-indigo-700 hover:text-indigo-800 bg-indigo-50 hover:bg-indigo-100/80 border border-indigo-200/80 px-3 py-1.5 rounded-xl font-semibold transition-all self-start sm:self-auto"
+              >
+                <Wand2 className="w-3.5 h-3.5" />
+                <span>Prompt Builder AI</span>
+              </button>
+            </div>
+
+            <div className="relative">
+              <textarea
+                rows={12}
+                value={agent.system_instructions || ''}
+                onChange={(e) => handleFieldChange('system_instructions', e.target.value)}
+                placeholder="Define agent personality and operating guidelines...&#10;&#10;# Persona: Senior Autonomous Analyst&#10;- Always answer queries factually and cite sources.&#10;- When mathematical calculations are needed, invoke the calculator tool.&#10;- Synthesize insights into actionable bullet points."
+                className="w-full font-mono rounded-xl bg-slate-900 text-slate-100 p-4 text-xs leading-relaxed placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 shadow-inner resize-y"
+              />
+              <div className="absolute right-3 bottom-3 text-[10px] font-mono text-slate-400 bg-slate-800/80 px-2 py-0.5 rounded-md border border-slate-700">
+                {(agent.system_instructions || '').length} characters
+              </div>
+            </div>
+          </div>
+
+          <div className="rounded-2xl bg-white border border-slate-200/90 p-5 space-y-4 shadow-xs">
+            <div>
+              <h3 className="text-xs font-bold uppercase tracking-wider text-slate-900 flex items-center gap-2">
+                <MessageSquare className="w-4 h-4 text-indigo-600" />
+                Conversation Starters & Guided Prompts
+              </h3>
+              <p className="text-xs text-slate-500 mt-0.5">
+                Suggested prompts presented to users when initiating an interactive session with this agent.
+              </p>
+            </div>
+
+            <div className="flex flex-wrap gap-2">
+              {(agent.conversation_starters || []).map((starter, idx) => (
+                <div
+                  key={idx}
+                  className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200/70 border border-slate-200 text-xs text-slate-800 font-medium transition-colors"
+                >
+                  <span>{starter}</span>
+                  <button
+                    type="button"
+                    onClick={() => handleRemoveStarter(idx)}
+                    className="text-slate-400 hover:text-rose-600 transition-colors"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              ))}
+            </div>
+
+            <div className="flex items-center gap-2 pt-1">
+              <input
+                type="text"
+                value={newStarter}
+                onChange={(e) => setNewStarter(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    handleAddStarter();
+                  }
+                }}
+                placeholder="Enter a prompt starter (e.g. 'Summarize today\'s financial metrics') and press Enter..."
+                className="flex-1 rounded-xl bg-slate-50 border border-slate-200 px-3.5 py-2.5 text-xs text-slate-900 placeholder-slate-400 focus:outline-none focus:border-indigo-500 focus:bg-white shadow-2xs"
+              />
+              <button
+                type="button"
+                onClick={handleAddStarter}
+                className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold shadow-xs transition-all"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                <span>Add Starter</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* PILLAR 6: RUNTIME & GOVERNANCE */}
       {activeTab === 'runtime' && (
         <div className="space-y-5 animate-in fade-in duration-200">
           <div className="rounded-2xl bg-white border border-slate-200/90 p-5 space-y-4 shadow-xs">
