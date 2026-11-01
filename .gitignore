@@ -52,5 +52,6 @@ Thumbs.db
 
 # Firebase Cache & Logs
 .firebase/
+.wrangler/
 firebase-debug.log
 firebase-debug.*.log

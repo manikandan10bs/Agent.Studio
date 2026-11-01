@@ -69,8 +69,21 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   useEffect(() => {
+    let resolved = false;
+    const timeoutId = setTimeout(() => {
+      if (!resolved) {
+        resolved = true;
+        console.warn('Firebase auth check timed out; falling back to direct session check');
+        refreshUser();
+      }
+    }, 1500);
+
     if (isFirebaseActive && auth) {
       const unsubscribe = onAuthStateChanged(auth, async (fbUser: FirebaseUser | null) => {
+        if (resolved) return;
+        resolved = true;
+        clearTimeout(timeoutId);
+
         if (fbUser) {
           try {
             const token = await fbUser.getIdToken();
@@ -86,8 +99,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           await refreshUser();
         }
       });
-      return () => unsubscribe();
+
+      return () => {
+        clearTimeout(timeoutId);
+        unsubscribe();
+      };
     } else {
+      clearTimeout(timeoutId);
       refreshUser();
     }
   }, [isFirebaseActive]);

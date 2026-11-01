@@ -25,7 +25,7 @@ class Settings(BaseSettings):
     SUPABASE_STORAGE_BUCKET: str = "agent-documents"
 
     # Firebase & Google Cloud
-    FIREBASE_PROJECT_ID: Optional[str] = None
+    FIREBASE_PROJECT_ID: Optional[str] = "agent-studio-def1d"
     FIREBASE_CREDENTIALS_PATH: Optional[str] = None
     FIREBASE_CREDENTIALS_JSON: Optional[str] = None
     USE_FIRESTORE: bool = True
