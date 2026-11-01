@@ -57,29 +57,29 @@ class GroqAdapter(BaseLLMAdapter):
         if res is None:
             raise RuntimeError("Failed to receive response from Groq API.")
 
-            if res.status_code != 200:
-                try:
-                    err_json = res.json()
-                    err_msg = err_json.get("error", {}).get("message", res.text)
-                except Exception:
-                    err_msg = res.text
-                raise RuntimeError(f"Groq API error ({res.status_code}): {err_msg}")
+        if res.status_code != 200:
+            try:
+                err_json = res.json()
+                err_msg = err_json.get("error", {}).get("message", res.text)
+            except Exception:
+                err_msg = res.text
+            raise RuntimeError(f"Groq API error ({res.status_code}): {err_msg}")
 
-            data = res.json()
-            content = data["choices"][0]["message"]["content"]
-            usage_data = data.get("usage", {})
-            usage = LLMUsage(
-                prompt_tokens=usage_data.get("prompt_tokens", 0),
-                completion_tokens=usage_data.get("completion_tokens", 0),
-                total_tokens=usage_data.get("total_tokens", 0)
-            )
+        data = res.json()
+        content = data["choices"][0]["message"]["content"]
+        usage_data = data.get("usage", {})
+        usage = LLMUsage(
+            prompt_tokens=usage_data.get("prompt_tokens", 0),
+            completion_tokens=usage_data.get("completion_tokens", 0),
+            total_tokens=usage_data.get("total_tokens", 0)
+        )
 
-            return LLMResponse(
-                content=content,
-                usage=usage,
-                model=model_name,
-                latency_ms=latency_ms
-            )
+        return LLMResponse(
+            content=content,
+            usage=usage,
+            model=model_name,
+            latency_ms=latency_ms
+        )
 
     async def generate_stream(
         self,

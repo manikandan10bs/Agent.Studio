@@ -113,42 +113,42 @@ class GeminiAdapter(BaseLLMAdapter):
         if res is None:
             raise RuntimeError("Failed to receive response from Gemini API.")
 
-            if res.status_code != 200:
-                try:
-                    err_json = res.json()
-                    err_msg = err_json.get("error", {}).get("message", res.text)
-                except Exception:
-                    err_msg = res.text
-                raise RuntimeError(f"Gemini API error ({res.status_code}): {err_msg}")
+        if res.status_code != 200:
+            try:
+                err_json = res.json()
+                err_msg = err_json.get("error", {}).get("message", res.text)
+            except Exception:
+                err_msg = res.text
+            raise RuntimeError(f"Gemini API error ({res.status_code}): {err_msg}")
 
-            data = res.json()
-            candidates = data.get("candidates", [])
-            content_text = ""
-            tool_calls = []
-            parts = []
-            if candidates:
-                parts = candidates[0].get("content", {}).get("parts", [])
-                for p in parts:
-                    if "text" in p:
-                        content_text += p.get("text", "")
-                    if "functionCall" in p:
-                        tool_calls.append(p["functionCall"])
+        data = res.json()
+        candidates = data.get("candidates", [])
+        content_text = ""
+        tool_calls = []
+        parts = []
+        if candidates:
+            parts = candidates[0].get("content", {}).get("parts", [])
+            for p in parts:
+                if "text" in p:
+                    content_text += p.get("text", "")
+                if "functionCall" in p:
+                    tool_calls.append(p["functionCall"])
 
-            meta = data.get("usageMetadata", {})
-            usage = LLMUsage(
-                prompt_tokens=meta.get("promptTokenCount", 0),
-                completion_tokens=meta.get("candidatesTokenCount", 0),
-                total_tokens=meta.get("totalTokenCount", 0)
-            )
+        meta = data.get("usageMetadata", {})
+        usage = LLMUsage(
+            prompt_tokens=meta.get("promptTokenCount", 0),
+            completion_tokens=meta.get("candidatesTokenCount", 0),
+            total_tokens=meta.get("totalTokenCount", 0)
+        )
 
-            return LLMResponse(
-                content=content_text,
-                usage=usage,
-                model=model_name,
-                latency_ms=latency_ms,
-                tool_calls=tool_calls if tool_calls else None,
-                raw_parts=parts
-            )
+        return LLMResponse(
+            content=content_text,
+            usage=usage,
+            model=model_name,
+            latency_ms=latency_ms,
+            tool_calls=tool_calls if tool_calls else None,
+            raw_parts=parts
+        )
 
     async def generate_stream(
         self,

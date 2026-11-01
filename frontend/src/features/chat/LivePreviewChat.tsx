@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { Agent, Message, Citation, Conversation } from '../../types';
-import { api } from '../../services/api';
+import { api, API_BASE } from '../../services/api';
 import {
   Send,
   Sparkles,
@@ -132,13 +132,39 @@ export const LivePreviewChat: React.FC<LivePreviewChatProps> = ({
       textareaRef.current.style.height = 'auto';
     }
 
+    setIsGenerating(true);
+
+    let activeAgentId = agent.id;
+    if (!activeAgentId) {
+      try {
+        const created = await api.createAgent({
+          name: agent.name?.trim() || 'Precision Assistant',
+          description: agent.description || 'Custom Agent built with Agent.Studio',
+          system_instructions: agent.system_instructions || '',
+          conversation_starters: agent.conversation_starters || [],
+          base_model_id: agent.base_model_id,
+          capability_rag: agent.capability_rag || false,
+          capability_memory: agent.capability_memory !== false,
+          capability_streaming: agent.capability_streaming !== false,
+          enabled_tools: agent.enabled_tools || [],
+          tools_config: agent.tools_config || {},
+          is_public: agent.is_public || false
+        });
+        activeAgentId = created.id;
+        agent.id = created.id;
+      } catch (saveErr: any) {
+        setErrorBanner(saveErr.message || 'Please click "Save Draft" in the editor header before testing this agent.');
+        setIsGenerating(false);
+        return;
+      }
+    }
+
     const userMsg: Message = {
       role: 'user',
       content: text,
       created_at: new Date().toISOString(),
     };
     setMessages((prev) => [...prev, userMsg]);
-    setIsGenerating(true);
 
     if (agent.capability_streaming) {
       try {
@@ -148,7 +174,8 @@ export const LivePreviewChat: React.FC<LivePreviewChatProps> = ({
         };
         if (token) headers['Authorization'] = `Bearer ${token}`;
 
-        const res = await fetch(`/api/agents/${agent.id}/chat?is_demo=true`, {
+        const streamUrl = `${API_BASE}/agents/${activeAgentId}/chat?is_demo=true`;
+        const res = await fetch(streamUrl, {
           method: 'POST',
           headers,
           body: JSON.stringify({
@@ -231,6 +258,8 @@ export const LivePreviewChat: React.FC<LivePreviewChatProps> = ({
         let errMsg = err.message || 'Error communicating with provider.';
         if (errMsg.includes('11001') || errMsg.includes('getaddrinfo')) {
           errMsg = 'AI inference connection timed out. Please check your network connection or model configuration in Admin panel.';
+        } else if (errMsg.includes('Failed to fetch') || errMsg.includes('NetworkError') || errMsg.includes('connection refused')) {
+          errMsg = 'Cannot reach backend server. Please verify the backend service is running on http://127.0.0.1:8000.';
         }
         setErrorBanner(errMsg);
         setMessages((prev) => prev.slice(0, -1));
@@ -239,7 +268,7 @@ export const LivePreviewChat: React.FC<LivePreviewChatProps> = ({
       }
     } else {
       try {
-        const response = await api.sendChat(agent.id, text, conversationId, true);
+        const response = await api.sendChat(activeAgentId, text, conversationId, true);
         setConversationId(response.conversation_id);
         setMessages((prev) => [...prev, response.message]);
         loadConversations();
@@ -247,6 +276,8 @@ export const LivePreviewChat: React.FC<LivePreviewChatProps> = ({
         let errMsg = err.message || 'Error communicating with provider.';
         if (errMsg.includes('11001') || errMsg.includes('getaddrinfo')) {
           errMsg = 'AI inference connection timed out. Please check your network connection or model configuration in Admin panel.';
+        } else if (errMsg.includes('Failed to fetch') || errMsg.includes('NetworkError') || errMsg.includes('connection refused')) {
+          errMsg = 'Cannot reach backend server. Please verify the backend service is running on http://127.0.0.1:8000.';
         }
         setErrorBanner(errMsg);
       } finally {

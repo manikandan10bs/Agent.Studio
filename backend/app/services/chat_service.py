@@ -136,10 +136,10 @@ async def handle_agent_chat(
                     raw_contents=raw_contents
                 )
 
-                if not response.tool_calls:
+                if not response or not getattr(response, "tool_calls", None):
                     break
 
-                for call in response.tool_calls:
+                for call in (response.tool_calls or []):
                     call_name = call.get("name")
                     call_args = call.get("args") or {}
 
@@ -400,10 +400,10 @@ async def stream_agent_chat_generator(
                     raw_contents=raw_contents
                 )
 
-                if not response.tool_calls:
+                if not response or not getattr(response, "tool_calls", None):
                     break
 
-                for call in response.tool_calls:
+                for call in (response.tool_calls or []):
                     call_name = call.get("name")
                     call_args = call.get("args") or {}
 

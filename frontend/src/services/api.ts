@@ -23,7 +23,7 @@ const getApiBase = (): string => {
   return trimmed;
 };
 
-const API_BASE = getApiBase();
+export const API_BASE = getApiBase();
 
 function getHeaders(isJson = true): HeadersInit {
   const token = localStorage.getItem('agent_studio_token');
