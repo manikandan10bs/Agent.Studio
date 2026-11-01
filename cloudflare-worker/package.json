@@ -1,0 +1,19 @@
+{
+  "name": "agent-studio-worker",
+  "version": "1.0.0",
+  "description": "Agent.Studio Cloudflare Worker Edge Backend",
+  "main": "src/index.ts",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "build": "wrangler deploy --dry-run"
+  },
+  "dependencies": {
+    "hono": "^4.7.1"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^5.20261023.1",
+    "typescript": "^5.6.3",
+    "wrangler": "^4.156.0"
+  }
+}
