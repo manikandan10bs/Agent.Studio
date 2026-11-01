@@ -49,7 +49,8 @@ import {
   Terminal,
   Activity,
   Server,
-  Radio
+  Radio,
+  Power
 } from 'lucide-react';
 
 interface AgentFormProps {
@@ -79,7 +80,7 @@ export const AgentForm: React.FC<AgentFormProps> = ({
   onBackToList,
   onAgentPublished,
 }) => {
-  const [activeTab, setActiveTab] = useState<'model' | 'tools' | 'rag' | 'mcp' | 'instructions' | 'runtime'>('model');
+  const [activeTab, setActiveTab] = useState<'model' | 'instructions' | 'tools' | 'rag' | 'mcp' | 'runtime'>('model');
   const [thinkingLevel, setThinkingLevel] = useState('Not supported');
 
   const [models, setModels] = useState<Model[]>([]);
@@ -315,13 +316,14 @@ export const AgentForm: React.FC<AgentFormProps> = ({
     (m) => m.provider_name.toLowerCase() === (agent.provider_name || 'gemini').toLowerCase()
   );
 
-  // Tabs prioritized per user instructions: Model, Tools, RAG Settings, MCP Page
+  // Tabs strictly ordered per user instruction:
+  // 1. Model Selection, 2. System Instruction, 3. Tools, 4. RAG & Knowledge, 5. MCP, 6. Runtime
   const tabs = [
     { id: 'model', label: 'Model Selection', icon: Cpu },
-    { id: 'tools', label: 'Tools & Capabilities', icon: Wrench, count: (agent.enabled_tools || []).length },
-    { id: 'rag', label: 'RAG & Knowledge Settings', icon: BookOpen, count: documents.length },
-    { id: 'mcp', label: 'MCP (Model Context Protocol)', icon: Layers },
     { id: 'instructions', label: 'System Instructions', icon: Sparkles },
+    { id: 'tools', label: 'Tools', icon: Wrench, count: (agent.enabled_tools || []).length },
+    { id: 'rag', label: 'RAG & Knowledge', icon: BookOpen, count: documents.length, ragStatus: agent.capability_rag ? 'ON' : 'OFF' },
+    { id: 'mcp', label: 'MCP', icon: Layers },
     { id: 'runtime', label: 'Runtime & Governance', icon: ShieldCheck },
   ];
 
@@ -490,7 +492,7 @@ export const AgentForm: React.FC<AgentFormProps> = ({
         </div>
       </div>
 
-      {/* 3. STUDIO PILLAR NAVIGATION (Model, Tools, RAG Settings, MCP Page, Instructions, Runtime) */}
+      {/* 3. STUDIO PILLAR NAVIGATION (Model, Instructions, Tools, RAG & Knowledge, MCP, Runtime) */}
       <div className="flex items-center gap-1.5 p-1.5 rounded-2xl bg-slate-100/80 border border-slate-200/80 overflow-x-auto scrollbar-none">
         {tabs.map((tab) => {
           const Icon = tab.icon;
@@ -515,6 +517,17 @@ export const AgentForm: React.FC<AgentFormProps> = ({
                   }`}
                 >
                   {tab.count}
+                </span>
+              )}
+              {'ragStatus' in tab && (
+                <span
+                  className={`text-[9px] px-1.5 py-0.5 rounded-md font-bold uppercase transition-all ${
+                    tab.ragStatus === 'ON'
+                      ? 'bg-emerald-100 text-emerald-800 border border-emerald-300'
+                      : 'bg-slate-200 text-slate-600 border border-slate-300'
+                  }`}
+                >
+                  {tab.ragStatus}
                 </span>
               )}
             </button>
@@ -690,7 +703,102 @@ export const AgentForm: React.FC<AgentFormProps> = ({
         </div>
       )}
 
-      {/* PILLAR 2: TOOLS & CAPABILITIES */}
+      {/* PILLAR 2: SYSTEM INSTRUCTIONS */}
+      {activeTab === 'instructions' && (
+        <div className="space-y-5 animate-in fade-in duration-200">
+          <div className="rounded-2xl bg-white border border-slate-200/90 p-5 space-y-4 shadow-xs">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3 border-b border-slate-100">
+              <div>
+                <h3 className="text-xs font-bold uppercase tracking-wider text-slate-900 flex items-center gap-2">
+                  <Sparkles className="w-4 h-4 text-indigo-600" />
+                  System Instructions & Persona Definition
+                </h3>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  Program the agent's tone, constraints, problem-solving methodology, and output format.
+                </p>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setShowPromptBuilder(true)}
+                className="flex items-center gap-1.5 text-xs text-indigo-700 hover:text-indigo-800 bg-indigo-50 hover:bg-indigo-100/80 border border-indigo-200/80 px-3 py-1.5 rounded-xl font-semibold transition-all self-start sm:self-auto cursor-pointer"
+              >
+                <Wand2 className="w-3.5 h-3.5" />
+                <span>Prompt Builder AI</span>
+              </button>
+            </div>
+
+            <div className="relative">
+              <textarea
+                rows={12}
+                value={agent.system_instructions || ''}
+                onChange={(e) => handleFieldChange('system_instructions', e.target.value)}
+                placeholder="Define agent personality and operating guidelines...&#10;&#10;# Persona: Senior Autonomous Analyst&#10;- Always answer queries factually and cite sources.&#10;- When mathematical calculations are needed, invoke the calculator tool.&#10;- Synthesize insights into actionable bullet points."
+                className="w-full font-mono rounded-xl bg-slate-900 text-slate-100 p-4 text-xs leading-relaxed placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 shadow-inner resize-y"
+              />
+              <div className="absolute right-3 bottom-3 text-[10px] font-mono text-slate-400 bg-slate-800/80 px-2 py-0.5 rounded-md border border-slate-700">
+                {(agent.system_instructions || '').length} characters
+              </div>
+            </div>
+          </div>
+
+          <div className="rounded-2xl bg-white border border-slate-200/90 p-5 space-y-4 shadow-xs">
+            <div>
+              <h3 className="text-xs font-bold uppercase tracking-wider text-slate-900 flex items-center gap-2">
+                <MessageSquare className="w-4 h-4 text-indigo-600" />
+                Conversation Starters & Guided Prompts
+              </h3>
+              <p className="text-xs text-slate-500 mt-0.5">
+                Suggested prompts presented to users when initiating an interactive session with this agent.
+              </p>
+            </div>
+
+            <div className="flex flex-wrap gap-2">
+              {(agent.conversation_starters || []).map((starter, idx) => (
+                <div
+                  key={idx}
+                  className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200/70 border border-slate-200 text-xs text-slate-800 font-medium transition-colors"
+                >
+                  <span>{starter}</span>
+                  <button
+                    type="button"
+                    onClick={() => handleRemoveStarter(idx)}
+                    className="text-slate-400 hover:text-rose-600 transition-colors cursor-pointer"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              ))}
+            </div>
+
+            <div className="flex items-center gap-2 pt-1">
+              <input
+                type="text"
+                value={newStarter}
+                onChange={(e) => setNewStarter(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    handleAddStarter();
+                  }
+                }}
+                placeholder="Enter a prompt starter (e.g. 'Summarize today\'s financial metrics') and press Enter..."
+                className="flex-1 rounded-xl bg-slate-50 border border-slate-200 px-3.5 py-2.5 text-xs text-slate-900 placeholder-slate-400 focus:outline-none focus:border-indigo-500 focus:bg-white shadow-2xs"
+              />
+              <button
+                type="button"
+                onClick={handleAddStarter}
+                className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold shadow-xs transition-all cursor-pointer"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                <span>Add Starter</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* PILLAR 3: TOOLS & CAPABILITIES */}
       {activeTab === 'tools' && (
         <div className="space-y-4 animate-in fade-in duration-200 flex flex-col">
           <div className="rounded-2xl bg-white border border-slate-200/90 p-5 space-y-4 shadow-xs">
@@ -699,7 +807,11 @@ export const AgentForm: React.FC<AgentFormProps> = ({
                 <h3 className="text-xs font-bold uppercase tracking-wider text-slate-900 flex items-center gap-2">
                   <Wrench className="w-4 h-4 text-indigo-600" />
                   System Capabilities & Execution Tools
-                  <span className="text-[10px] font-bold text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded-full border border-indigo-200/80">
+                  <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
+                    (agent.enabled_tools || []).length > 0
+                      ? 'text-emerald-700 bg-emerald-50 border-emerald-200/80'
+                      : 'text-slate-500 bg-slate-100 border-slate-200'
+                  }`}>
                     {(agent.enabled_tools || []).length} of {availableTools.length} Armed
                   </span>
                 </h3>
@@ -727,7 +839,7 @@ export const AgentForm: React.FC<AgentFormProps> = ({
                   key={cat}
                   type="button"
                   onClick={() => setToolsCategory(cat)}
-                  className={`px-3 py-1 rounded-xl text-[11px] font-semibold transition-all whitespace-nowrap ${
+                  className={`px-3 py-1 rounded-xl text-[11px] font-semibold transition-all whitespace-nowrap cursor-pointer ${
                     toolsCategory === cat
                       ? 'bg-indigo-600 text-white shadow-xs'
                       : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
@@ -737,6 +849,37 @@ export const AgentForm: React.FC<AgentFormProps> = ({
                 </button>
               ))}
             </div>
+
+            {/* Armed Tools Status Strip */}
+            {(agent.enabled_tools || []).length === 0 ? (
+              <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200/90 flex items-center justify-between gap-3 text-xs">
+                <div className="flex items-center gap-2.5 text-slate-600">
+                  <Info className="w-4 h-4 text-slate-400 flex-shrink-0" />
+                  <span>
+                    <strong>Initially no tools added.</strong> You can add whatever tools your agent requires by toggling them below, or leave it empty for a pure conversational agent.
+                  </span>
+                </div>
+              </div>
+            ) : (
+              <div className="p-3.5 rounded-xl bg-emerald-50/70 border border-emerald-200/80 flex items-center justify-between gap-3 text-xs">
+                <div className="flex items-center gap-2.5 text-emerald-900">
+                  <CheckCircle2 className="w-4 h-4 text-emerald-600 flex-shrink-0" />
+                  <span>
+                    <strong>{(agent.enabled_tools || []).length} tool(s) armed:</strong>{' '}
+                    {(agent.enabled_tools || [])
+                      .map((id) => availableTools.find((t) => t.id === id)?.name || id)
+                      .join(', ')}
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => handleFieldChange('enabled_tools', [])}
+                  className="text-[11px] font-semibold text-rose-600 hover:text-rose-700 hover:underline flex-shrink-0 cursor-pointer"
+                >
+                  Clear all tools
+                </button>
+              </div>
+            )}
 
             {/* Tools Grid */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 pt-1">
@@ -851,32 +994,59 @@ export const AgentForm: React.FC<AgentFormProps> = ({
         </div>
       )}
 
-      {/* PILLAR 3: RAG & KNOWLEDGE SETTINGS */}
+      {/* PILLAR 4: RAG & KNOWLEDGE SETTINGS */}
       {activeTab === 'rag' && (
         <div className="space-y-5 animate-in fade-in duration-200">
           <div className="rounded-2xl bg-white border border-slate-200/90 p-5 space-y-4 shadow-xs">
-            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
-              <div>
-                <h3 className="text-xs font-bold uppercase tracking-wider text-slate-900 flex items-center gap-2">
-                  <Database className="w-4 h-4 text-indigo-600" />
-                  Semantic Document RAG & Vector Grounding
-                </h3>
-                <p className="text-xs text-slate-500 mt-0.5">
-                  Ground responses with verified domain knowledge chunks and verifiable citations.
-                </p>
+            {/* Master RAG ON/OFF Controller */}
+            <div className={`p-4 rounded-2xl border transition-all flex flex-col sm:flex-row sm:items-center justify-between gap-4 ${
+              agent.capability_rag 
+                ? 'bg-gradient-to-r from-emerald-500/10 via-teal-500/5 to-cyan-500/10 border-emerald-500/30' 
+                : 'bg-slate-100/70 border-slate-200'
+            }`}>
+              <div className="flex items-center gap-3">
+                <div className={`w-10 h-10 rounded-xl flex items-center justify-center font-bold text-xs ${
+                  agent.capability_rag 
+                    ? 'bg-emerald-600 text-white shadow-md shadow-emerald-500/30' 
+                    : 'bg-slate-300 text-slate-700'
+                }`}>
+                  {agent.capability_rag ? 'ON' : 'OFF'}
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <h4 className="text-sm font-bold text-slate-900">
+                      RAG & Knowledge Grounding
+                    </h4>
+                    <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold uppercase tracking-wider ${
+                      agent.capability_rag 
+                        ? 'bg-emerald-100 text-emerald-800 border border-emerald-300' 
+                        : 'bg-slate-200 text-slate-600 border border-slate-300'
+                    }`}>
+                      {agent.capability_rag ? '● Active' : '○ Turned Off'}
+                    </span>
+                  </div>
+                  <p className="text-xs text-slate-500 mt-0.5">
+                    {agent.capability_rag 
+                      ? 'Semantic vector retrieval is enabled. The agent grounds answers with attached documents and citations.'
+                      : 'Knowledge grounding is turned off. The agent will respond directly from the foundation model without searching documents.'
+                    }
+                  </p>
+                </div>
               </div>
 
-              <div className="flex items-center gap-2">
-                <span className="text-xs font-semibold text-slate-700">RAG Grounding:</span>
-                <label className="relative inline-flex items-center cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={agent.capability_rag}
-                    onChange={(e) => handleFieldChange('capability_rag', e.target.checked)}
-                    className="sr-only peer"
-                  />
-                  <div className="w-8 h-4.5 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-3.5 after:w-3.5 after:transition-all peer-checked:bg-indigo-600"></div>
-                </label>
+              <div className="flex items-center gap-2 self-end sm:self-auto">
+                <button
+                  type="button"
+                  onClick={() => handleFieldChange('capability_rag', !agent.capability_rag)}
+                  className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all shadow-xs cursor-pointer ${
+                    agent.capability_rag
+                      ? 'bg-rose-50 text-rose-700 border border-rose-200 hover:bg-rose-100'
+                      : 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-emerald-500/20'
+                  }`}
+                >
+                  <Power className="w-3.5 h-3.5" />
+                  <span>{agent.capability_rag ? 'Turn OFF RAG' : 'Turn ON RAG'}</span>
+                </button>
               </div>
             </div>
 
@@ -1127,101 +1297,6 @@ export const AgentForm: React.FC<AgentFormProps> = ({
                   </div>
                 </div>
               </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* PILLAR 5: INSTRUCTIONS & STARTERS */}
-      {activeTab === 'instructions' && (
-        <div className="space-y-5 animate-in fade-in duration-200">
-          <div className="rounded-2xl bg-white border border-slate-200/90 p-5 space-y-4 shadow-xs">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3 border-b border-slate-100">
-              <div>
-                <h3 className="text-xs font-bold uppercase tracking-wider text-slate-900 flex items-center gap-2">
-                  <Sparkles className="w-4 h-4 text-indigo-600" />
-                  System Instructions & Persona Definition
-                </h3>
-                <p className="text-xs text-slate-500 mt-0.5">
-                  Program the agent's tone, constraints, problem-solving methodology, and output format.
-                </p>
-              </div>
-
-              <button
-                type="button"
-                onClick={() => setShowPromptBuilder(true)}
-                className="flex items-center gap-1.5 text-xs text-indigo-700 hover:text-indigo-800 bg-indigo-50 hover:bg-indigo-100/80 border border-indigo-200/80 px-3 py-1.5 rounded-xl font-semibold transition-all self-start sm:self-auto"
-              >
-                <Wand2 className="w-3.5 h-3.5" />
-                <span>Prompt Builder AI</span>
-              </button>
-            </div>
-
-            <div className="relative">
-              <textarea
-                rows={12}
-                value={agent.system_instructions || ''}
-                onChange={(e) => handleFieldChange('system_instructions', e.target.value)}
-                placeholder="Define agent personality and operating guidelines...&#10;&#10;# Persona: Senior Autonomous Analyst&#10;- Always answer queries factually and cite sources.&#10;- When mathematical calculations are needed, invoke the calculator tool.&#10;- Synthesize insights into actionable bullet points."
-                className="w-full font-mono rounded-xl bg-slate-900 text-slate-100 p-4 text-xs leading-relaxed placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 shadow-inner resize-y"
-              />
-              <div className="absolute right-3 bottom-3 text-[10px] font-mono text-slate-400 bg-slate-800/80 px-2 py-0.5 rounded-md border border-slate-700">
-                {(agent.system_instructions || '').length} characters
-              </div>
-            </div>
-          </div>
-
-          <div className="rounded-2xl bg-white border border-slate-200/90 p-5 space-y-4 shadow-xs">
-            <div>
-              <h3 className="text-xs font-bold uppercase tracking-wider text-slate-900 flex items-center gap-2">
-                <MessageSquare className="w-4 h-4 text-indigo-600" />
-                Conversation Starters & Guided Prompts
-              </h3>
-              <p className="text-xs text-slate-500 mt-0.5">
-                Suggested prompts presented to users when initiating an interactive session with this agent.
-              </p>
-            </div>
-
-            <div className="flex flex-wrap gap-2">
-              {(agent.conversation_starters || []).map((starter, idx) => (
-                <div
-                  key={idx}
-                  className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200/70 border border-slate-200 text-xs text-slate-800 font-medium transition-colors"
-                >
-                  <span>{starter}</span>
-                  <button
-                    type="button"
-                    onClick={() => handleRemoveStarter(idx)}
-                    className="text-slate-400 hover:text-rose-600 transition-colors"
-                  >
-                    <X className="w-3.5 h-3.5" />
-                  </button>
-                </div>
-              ))}
-            </div>
-
-            <div className="flex items-center gap-2 pt-1">
-              <input
-                type="text"
-                value={newStarter}
-                onChange={(e) => setNewStarter(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') {
-                    e.preventDefault();
-                    handleAddStarter();
-                  }
-                }}
-                placeholder="Enter a prompt starter (e.g. 'Summarize today\'s financial metrics') and press Enter..."
-                className="flex-1 rounded-xl bg-slate-50 border border-slate-200 px-3.5 py-2.5 text-xs text-slate-900 placeholder-slate-400 focus:outline-none focus:border-indigo-500 focus:bg-white shadow-2xs"
-              />
-              <button
-                type="button"
-                onClick={handleAddStarter}
-                className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold shadow-xs transition-all"
-              >
-                <Plus className="w-3.5 h-3.5" />
-                <span>Add Starter</span>
-              </button>
             </div>
           </div>
         </div>
