@@ -228,7 +228,11 @@ export const LivePreviewChat: React.FC<LivePreviewChatProps> = ({
           loadConversations();
         }
       } catch (err: any) {
-        setErrorBanner(err.message || 'Error communicating with provider.');
+        let errMsg = err.message || 'Error communicating with provider.';
+        if (errMsg.includes('11001') || errMsg.includes('getaddrinfo')) {
+          errMsg = 'AI inference connection timed out. Please check your network connection or model configuration in Admin panel.';
+        }
+        setErrorBanner(errMsg);
         setMessages((prev) => prev.slice(0, -1));
       } finally {
         setIsGenerating(false);
@@ -240,7 +244,11 @@ export const LivePreviewChat: React.FC<LivePreviewChatProps> = ({
         setMessages((prev) => [...prev, response.message]);
         loadConversations();
       } catch (err: any) {
-        setErrorBanner(err.message || 'Error communicating with provider.');
+        let errMsg = err.message || 'Error communicating with provider.';
+        if (errMsg.includes('11001') || errMsg.includes('getaddrinfo')) {
+          errMsg = 'AI inference connection timed out. Please check your network connection or model configuration in Admin panel.';
+        }
+        setErrorBanner(errMsg);
       } finally {
         setIsGenerating(false);
       }

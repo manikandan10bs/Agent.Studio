@@ -111,7 +111,7 @@ export const StudioPage: React.FC = () => {
       base_model_id: models[0]?.id,
       base_model_name: models[0]?.display_name || 'Gemini 2.5 Flash',
       provider_name: models[0]?.provider_name || 'gemini',
-      capability_rag: true,
+      capability_rag: false,
       capability_memory: true,
       capability_streaming: true,
       enabled_tools: [],

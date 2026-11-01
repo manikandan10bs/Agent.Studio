@@ -94,9 +94,24 @@ class GeminiAdapter(BaseLLMAdapter):
             payload["tools"] = [{"function_declarations": sanitized_tools}]
 
         start_time = time.time()
-        async with httpx.AsyncClient(timeout=60.0) as client:
-            res = await client.post(url, json=payload)
-            latency_ms = int((time.time() - start_time) * 1000)
+        res = None
+        for attempt in range(2):
+            try:
+                async with httpx.AsyncClient(timeout=60.0) as client:
+                    res = await client.post(url, json=payload)
+                    latency_ms = int((time.time() - start_time) * 1000)
+                    break
+            except (httpx.ConnectError, httpx.NetworkError) as e:
+                if attempt == 0:
+                    import asyncio
+                    await asyncio.sleep(1.0)
+                    continue
+                raise RuntimeError(
+                    f"Network connection to Google Gemini API failed (DNS lookup or timeout). Please check your internet connection."
+                )
+
+        if res is None:
+            raise RuntimeError("Failed to receive response from Gemini API.")
 
             if res.status_code != 200:
                 try:
@@ -195,6 +210,11 @@ class GeminiAdapter(BaseLLMAdapter):
                             except Exception:
                                 continue
             yield LLMStreamChunk(is_done=True)
+        except (httpx.ConnectError, httpx.NetworkError) as e:
+            yield LLMStreamChunk(
+                error=f"Network connection to AI service failed (DNS lookup or internet timeout). Please verify your internet connection.",
+                is_done=True
+            )
         except Exception as e:
             yield LLMStreamChunk(error=str(e), is_done=True)
 

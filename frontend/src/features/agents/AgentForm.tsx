@@ -925,8 +925,19 @@ export const AgentForm: React.FC<AgentFormProps> = ({
                               {tool.icon === 'Globe' && <Globe className="w-4 h-4 text-emerald-600" />}
                             </div>
 
-                            <div>
-                              <h4 className="text-xs font-bold text-slate-900 leading-tight">{tool.name}</h4>
+                            <div className="min-w-0">
+                              <div className="flex items-center gap-2">
+                                <h4 className="text-xs font-bold text-slate-900 leading-tight">{tool.name}</h4>
+                                {isAgentToolEnabled ? (
+                                  <span className="flex items-center gap-1 text-[10px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-1.5 py-0.5 rounded-full">
+                                    <CheckCircle2 className="w-2.5 h-2.5" /> Armed
+                                  </span>
+                                ) : (
+                                  <span className="text-[10px] font-medium text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded-full border border-slate-200">
+                                    Disabled
+                                  </span>
+                                )}
+                              </div>
                               <span className="text-[10px] text-slate-400 font-medium">{tool.category}</span>
                             </div>
                           </div>
@@ -960,31 +971,63 @@ export const AgentForm: React.FC<AgentFormProps> = ({
                         </p>
                       </div>
 
-                      <div className="mt-3.5 pt-2.5 border-t border-slate-100 flex items-center justify-between text-[11px]">
-                        <button
-                          type="button"
-                          onClick={() => setActiveConfigureTool(tool)}
-                          className="text-slate-500 hover:text-slate-900 font-medium flex items-center gap-1 transition-colors"
-                        >
-                          <Settings className="w-3 h-3" />
-                          <span>Schema</span>
-                        </button>
+                      <div className="mt-3.5 pt-2.5 border-t border-slate-100 flex items-center justify-between text-[11px] gap-2">
+                        <div className="flex items-center gap-3">
+                          <button
+                            type="button"
+                            onClick={() => setActiveConfigureTool(tool)}
+                            className="text-slate-500 hover:text-slate-900 font-medium flex items-center gap-1 transition-colors cursor-pointer"
+                          >
+                            <Settings className="w-3 h-3" />
+                            <span>Schema</span>
+                          </button>
 
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setActiveTestTool(tool);
-                            setTestResult(null);
-                            if (tool.id === 'calculator') setTestParams({ expression: '45 * 12 + 100' });
-                            else if (tool.id === 'datetime_tool') setTestParams({ operation: 'now' });
-                            else if (tool.id === 'url_validator') setTestParams({ url: 'https://example.com' });
-                            else setTestParams({});
-                          }}
-                          className="text-indigo-600 hover:text-indigo-700 font-semibold flex items-center gap-1 transition-colors"
-                        >
-                          <Play className="w-3 h-3 fill-indigo-600" />
-                          <span>Sandbox Test</span>
-                        </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setActiveTestTool(tool);
+                              setTestResult(null);
+                              if (tool.id === 'calculator') setTestParams({ expression: '45 * 12 + 100' });
+                              else if (tool.id === 'datetime_tool') setTestParams({ operation: 'now' });
+                              else if (tool.id === 'url_validator') setTestParams({ url: 'https://example.com' });
+                              else setTestParams({});
+                            }}
+                            className="text-indigo-600 hover:text-indigo-700 font-semibold flex items-center gap-1 transition-colors cursor-pointer"
+                          >
+                            <Play className="w-3 h-3 fill-indigo-600" />
+                            <span>Test</span>
+                          </button>
+                        </div>
+
+                        {!isToolAdminDisabled && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const current = agent.enabled_tools || [];
+                              const next = isAgentToolEnabled
+                                ? current.filter((id) => id !== tool.id)
+                                : [...current, tool.id];
+                              handleFieldChange('enabled_tools', next);
+                            }}
+                            className={`flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-bold transition-all cursor-pointer ${
+                              isAgentToolEnabled
+                                ? 'bg-rose-50 text-rose-700 hover:bg-rose-100 border border-rose-200'
+                                : 'bg-indigo-600 hover:bg-indigo-700 text-white shadow-2xs'
+                            }`}
+                          >
+                            {isAgentToolEnabled ? (
+                              <>
+                                <X className="w-3 h-3" />
+                                <span>Disable</span>
+                              </>
+                            ) : (
+                              <>
+                                <Plus className="w-3 h-3" />
+                                <span>Enable Tool</span>
+                              </>
+                            )}
+                          </button>
+                        )}
                       </div>
                     </div>
                   );
@@ -996,170 +1039,192 @@ export const AgentForm: React.FC<AgentFormProps> = ({
 
       {/* PILLAR 4: RAG & KNOWLEDGE SETTINGS */}
       {activeTab === 'rag' && (
-        <div className="space-y-5 animate-in fade-in duration-200">
+        <div className="space-y-4 animate-in fade-in duration-200">
           <div className="rounded-2xl bg-white border border-slate-200/90 p-5 space-y-4 shadow-xs">
-            {/* Master RAG ON/OFF Controller */}
-            <div className={`p-4 rounded-2xl border transition-all flex flex-col sm:flex-row sm:items-center justify-between gap-4 ${
-              agent.capability_rag 
-                ? 'bg-gradient-to-r from-emerald-500/10 via-teal-500/5 to-cyan-500/10 border-emerald-500/30' 
-                : 'bg-slate-100/70 border-slate-200'
-            }`}>
-              <div className="flex items-center gap-3">
-                <div className={`w-10 h-10 rounded-xl flex items-center justify-center font-bold text-xs ${
-                  agent.capability_rag 
-                    ? 'bg-emerald-600 text-white shadow-md shadow-emerald-500/30' 
-                    : 'bg-slate-300 text-slate-700'
-                }`}>
-                  {agent.capability_rag ? 'ON' : 'OFF'}
+            {/* Sleek RAG Controller Header */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-100">
+              <div>
+                <div className="flex items-center gap-2">
+                  <h3 className="text-xs font-bold uppercase tracking-wider text-slate-900 flex items-center gap-2">
+                    <BookOpen className="w-4 h-4 text-indigo-600" />
+                    RAG & Knowledge Grounding
+                  </h3>
+                  <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold uppercase tracking-wider border ${
+                    agent.capability_rag 
+                      ? 'bg-emerald-50 text-emerald-800 border-emerald-200' 
+                      : 'bg-slate-100 text-slate-600 border-slate-200'
+                  }`}>
+                    {agent.capability_rag ? '● Active' : '○ Inactive'}
+                  </span>
                 </div>
-                <div>
-                  <div className="flex items-center gap-2">
-                    <h4 className="text-sm font-bold text-slate-900">
-                      RAG & Knowledge Grounding
-                    </h4>
-                    <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold uppercase tracking-wider ${
-                      agent.capability_rag 
-                        ? 'bg-emerald-100 text-emerald-800 border border-emerald-300' 
-                        : 'bg-slate-200 text-slate-600 border border-slate-300'
-                    }`}>
-                      {agent.capability_rag ? '● Active' : '○ Turned Off'}
-                    </span>
-                  </div>
-                  <p className="text-xs text-slate-500 mt-0.5">
-                    {agent.capability_rag 
-                      ? 'Semantic vector retrieval is enabled. The agent grounds answers with attached documents and citations.'
-                      : 'Knowledge grounding is turned off. The agent will respond directly from the foundation model without searching documents.'
-                    }
-                  </p>
-                </div>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  {agent.capability_rag 
+                    ? 'Semantic vector retrieval is active. The agent grounds answers with attached documents and verified citations.'
+                    : 'RAG is currently turned off. Enable RAG to activate document uploading and knowledge grounding.'}
+                </p>
               </div>
 
-              <div className="flex items-center gap-2 self-end sm:self-auto">
+              <div className="flex items-center gap-2">
                 <button
                   type="button"
                   onClick={() => handleFieldChange('capability_rag', !agent.capability_rag)}
-                  className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all shadow-xs cursor-pointer ${
+                  className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-semibold transition-all cursor-pointer shadow-xs ${
                     agent.capability_rag
-                      ? 'bg-rose-50 text-rose-700 border border-rose-200 hover:bg-rose-100'
-                      : 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-emerald-500/20'
+                      ? 'bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200'
+                      : 'bg-indigo-600 hover:bg-indigo-700 text-white shadow-indigo-500/20'
                   }`}
                 >
-                  <Power className="w-3.5 h-3.5" />
-                  <span>{agent.capability_rag ? 'Turn OFF RAG' : 'Turn ON RAG'}</span>
+                  {agent.capability_rag ? (
+                    <>
+                      <Power className="w-3.5 h-3.5 text-slate-500" />
+                      <span>Disable RAG</span>
+                    </>
+                  ) : (
+                    <>
+                      <Plus className="w-3.5 h-3.5" />
+                      <span>Enable RAG</span>
+                    </>
+                  )}
                 </button>
               </div>
             </div>
 
-            {/* RAG Settings Parameters */}
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 p-3.5 rounded-xl bg-slate-50 border border-slate-200/80 text-xs">
-              <div>
-                <span className="text-[10px] uppercase font-bold text-slate-400 block mb-0.5">Chunk Size</span>
-                <span className="font-semibold text-slate-800">500 Tokens / Segment</span>
-              </div>
-              <div>
-                <span className="text-[10px] uppercase font-bold text-slate-400 block mb-0.5">Overlap Window</span>
-                <span className="font-semibold text-slate-800">50 Tokens</span>
-              </div>
-              <div>
-                <span className="text-[10px] uppercase font-bold text-slate-400 block mb-0.5">Similarity Metric</span>
-                <span className="font-semibold text-indigo-600">Cosine (Top-4 Semantic Chunks)</span>
-              </div>
-            </div>
+            {/* When RAG is Active: show parameters, upload section, and documents */}
+            {agent.capability_rag ? (
+              <div className="space-y-4 pt-1 animate-in fade-in duration-200">
+                {/* RAG Settings Parameters */}
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 p-3.5 rounded-xl bg-slate-50 border border-slate-200/80 text-xs">
+                  <div>
+                    <span className="text-[10px] uppercase font-bold text-slate-400 block mb-0.5">Chunk Size</span>
+                    <span className="font-semibold text-slate-800">500 Tokens / Segment</span>
+                  </div>
+                  <div>
+                    <span className="text-[10px] uppercase font-bold text-slate-400 block mb-0.5">Overlap Window</span>
+                    <span className="font-semibold text-slate-800">50 Tokens</span>
+                  </div>
+                  <div>
+                    <span className="text-[10px] uppercase font-bold text-slate-400 block mb-0.5">Similarity Metric</span>
+                    <span className="font-semibold text-indigo-600">Cosine (Top-4 Semantic Chunks)</span>
+                  </div>
+                </div>
 
-            {/* Upload Dropzone */}
-            <label className="flex flex-col items-center justify-center p-6 border-2 border-dashed border-slate-200 hover:border-indigo-400 rounded-2xl bg-slate-50/60 hover:bg-indigo-50/20 cursor-pointer transition-all group">
-              <input
-                type="file"
-                multiple
-                accept=".pdf,.txt,.docx,.md"
-                onChange={handleFileUpload}
-                disabled={isUploading || !agent.id}
-                className="hidden"
-              />
-              <div className="p-3 rounded-2xl bg-indigo-100/80 text-indigo-600 group-hover:scale-105 transition-transform shadow-xs">
-                {isUploading ? (
-                  <Loader2 className="w-6 h-6 animate-spin" />
-                ) : (
-                  <UploadCloud className="w-6 h-6" />
+                {/* Upload Dropzone */}
+                <label className="flex flex-col items-center justify-center p-6 border-2 border-dashed border-slate-200 hover:border-indigo-400 rounded-2xl bg-slate-50/60 hover:bg-indigo-50/20 cursor-pointer transition-all group">
+                  <input
+                    type="file"
+                    multiple
+                    accept=".pdf,.txt,.docx,.md"
+                    onChange={handleFileUpload}
+                    disabled={isUploading || !agent.id}
+                    className="hidden"
+                  />
+                  <div className="p-3 rounded-2xl bg-indigo-100/80 text-indigo-600 group-hover:scale-105 transition-transform shadow-xs">
+                    {isUploading ? (
+                      <Loader2 className="w-6 h-6 animate-spin" />
+                    ) : (
+                      <UploadCloud className="w-6 h-6" />
+                    )}
+                  </div>
+                  <span className="text-xs font-bold text-slate-900 mt-3">
+                    {isUploading ? 'Generating semantic vector embeddings...' : 'Upload Knowledge Documents'}
+                  </span>
+                  <span className="text-[11px] text-slate-500 mt-0.5">
+                    {!agent.id
+                      ? 'Please save agent as draft first before uploading files'
+                      : 'Supports PDF, Word (.docx), Markdown (.md), and Text files up to 25MB'}
+                  </span>
+                </label>
+
+                {uploadError && (
+                  <div className="p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-xs flex items-center gap-2">
+                    <AlertTriangle className="w-4 h-4 flex-shrink-0" />
+                    <span>{uploadError}</span>
+                  </div>
                 )}
-              </div>
-              <span className="text-xs font-bold text-slate-900 mt-3">
-                {isUploading ? 'Generating semantic vector embeddings...' : 'Upload Knowledge Documents'}
-              </span>
-              <span className="text-[11px] text-slate-500 mt-0.5">
-                {!agent.id
-                  ? 'Please save agent as draft first before uploading files'
-                  : 'Supports PDF, Word (.docx), Markdown (.md), and Text files up to 25MB'}
-              </span>
-            </label>
 
-            {uploadError && (
-              <div className="p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-xs flex items-center gap-2">
-                <AlertTriangle className="w-4 h-4 flex-shrink-0" />
-                <span>{uploadError}</span>
-              </div>
-            )}
+                {/* Document Index List */}
+                <div className="space-y-2 pt-2">
+                  <div className="flex items-center justify-between text-xs text-slate-500 font-semibold px-1">
+                    <span>Indexed Documents ({documents.length})</span>
+                    <span>Embedding Status</span>
+                  </div>
 
-            {/* Document Index List */}
-            <div className="space-y-2 pt-2">
-              <div className="flex items-center justify-between text-xs text-slate-500 font-semibold px-1">
-                <span>Indexed Documents ({documents.length})</span>
-                <span>Embedding Status</span>
-              </div>
+                  {documents.length === 0 ? (
+                    <div className="p-8 rounded-2xl border border-dashed border-slate-200 bg-slate-50/50 text-center">
+                      <BookOpen className="w-8 h-8 text-slate-300 mx-auto mb-2" />
+                      <p className="text-xs font-semibold text-slate-700">No knowledge documents attached yet</p>
+                      <p className="text-[11px] text-slate-400 mt-1 max-w-sm mx-auto">
+                        Attach reference documents to allow this agent to perform retrieval-augmented generation and quote exact source materials.
+                      </p>
+                    </div>
+                  ) : (
+                    documents.map((doc) => (
+                      <div
+                        key={doc.id}
+                        className="flex items-center justify-between p-3.5 rounded-xl bg-slate-50/70 hover:bg-slate-50 border border-slate-200/80 transition-colors"
+                      >
+                        <div className="flex items-center gap-3 min-w-0">
+                          <div className="p-2.5 rounded-xl bg-white border border-slate-200 text-indigo-600 shadow-2xs">
+                            <FileText className="w-4 h-4" />
+                          </div>
+                          <div className="min-w-0">
+                            <p className="text-xs font-bold text-slate-900 truncate">
+                              {doc.filename}
+                            </p>
+                            <p className="text-[11px] text-slate-500 font-mono">
+                              {Math.round(doc.file_size / 1024)} KB • {doc.chunk_count} vector chunks indexed
+                            </p>
+                          </div>
+                        </div>
 
-              {documents.length === 0 ? (
-                <div className="p-8 rounded-2xl border border-dashed border-slate-200 bg-slate-50/50 text-center">
-                  <BookOpen className="w-8 h-8 text-slate-300 mx-auto mb-2" />
-                  <p className="text-xs font-semibold text-slate-700">No knowledge documents attached yet</p>
-                  <p className="text-[11px] text-slate-400 mt-1 max-w-sm mx-auto">
-                    Attach reference documents to allow this agent to perform retrieval-augmented generation and quote exact source materials.
+                        <div className="flex items-center gap-3">
+                          <span
+                            className={`text-[10px] px-2.5 py-0.5 rounded-full font-semibold border ${
+                              doc.status === 'completed'
+                                ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                                : doc.status === 'processing'
+                                ? 'bg-amber-50 text-amber-700 border-amber-200 animate-pulse'
+                                : 'bg-rose-50 text-rose-700 border-rose-200'
+                            }`}
+                          >
+                            {doc.status === 'completed' ? 'Vectorized' : doc.status}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteDocument(doc.id)}
+                            className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors"
+                            title="Remove Document"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+            ) : (
+              /* When RAG is Inactive: show clean activation card */
+              <div className="p-8 rounded-2xl border border-dashed border-slate-200 bg-slate-50/50 text-center space-y-3 animate-in fade-in duration-200">
+                <div className="w-10 h-10 rounded-xl bg-slate-100 border border-slate-200 flex items-center justify-center mx-auto text-slate-400">
+                  <BookOpen className="w-5 h-5" />
+                </div>
+                <div>
+                  <h4 className="text-xs font-bold text-slate-800">RAG & Knowledge Grounding is Inactive</h4>
+                  <p className="text-xs text-slate-500 max-w-md mx-auto mt-1">
+                    Enable RAG to activate document uploading, semantic vectorization, and grounded citations for this agent.
                   </p>
                 </div>
-              ) : (
-                documents.map((doc) => (
-                  <div
-                    key={doc.id}
-                    className="flex items-center justify-between p-3.5 rounded-xl bg-slate-50/70 hover:bg-slate-50 border border-slate-200/80 transition-colors"
-                  >
-                    <div className="flex items-center gap-3 min-w-0">
-                      <div className="p-2.5 rounded-xl bg-white border border-slate-200 text-indigo-600 shadow-2xs">
-                        <FileText className="w-4 h-4" />
-                      </div>
-                      <div className="min-w-0">
-                        <p className="text-xs font-bold text-slate-900 truncate">
-                          {doc.filename}
-                        </p>
-                        <p className="text-[11px] text-slate-500 font-mono">
-                          {Math.round(doc.file_size / 1024)} KB • {doc.chunk_count} vector chunks indexed
-                        </p>
-                      </div>
-                    </div>
-
-                    <div className="flex items-center gap-3">
-                      <span
-                        className={`text-[10px] px-2.5 py-0.5 rounded-full font-semibold border ${
-                          doc.status === 'completed'
-                            ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
-                            : doc.status === 'processing'
-                            ? 'bg-amber-50 text-amber-700 border-amber-200 animate-pulse'
-                            : 'bg-rose-50 text-rose-700 border-rose-200'
-                        }`}
-                      >
-                        {doc.status === 'completed' ? 'Vectorized' : doc.status}
-                      </span>
-                      <button
-                        type="button"
-                        onClick={() => handleDeleteDocument(doc.id)}
-                        className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors"
-                        title="Remove Document"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                    </div>
-                  </div>
-                ))
-              )}
-            </div>
+                <button
+                  type="button"
+                  onClick={() => handleFieldChange('capability_rag', true)}
+                  className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold shadow-xs transition-all cursor-pointer"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                  <span>Enable RAG & Open Document Uploader</span>
+                </button>
+              </div>
+            )}
           </div>
         </div>
       )}

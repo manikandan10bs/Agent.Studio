@@ -91,6 +91,8 @@ def is_ssrf_safe_url(url: str) -> Tuple[bool, str, Optional[str]]:
         try:
             ip_str = socket.gethostbyname(hostname)
             ip_obj = ipaddress.ip_address(ip_str)
+        except socket.gaierror:
+            return False, f"Unable to resolve domain '{hostname}' (DNS lookup failed). The domain may be unreachable or offline.", None
         except Exception as e:
             return False, f"Could not resolve hostname '{hostname}': {str(e)}", None
 

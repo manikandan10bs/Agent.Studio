@@ -94,6 +94,7 @@ if frontend_dist:
         app.mount("/assets", StaticFiles(directory=assets_dir), name="assets")
 
     @app.get("/{full_path:path}")
+    @app.head("/{full_path:path}")
     async def serve_spa(full_path: str):
         # Do not intercept /api routes or FastAPI documentation
         if full_path.startswith("api") or full_path in ["docs", "redoc", "openapi.json"]:
