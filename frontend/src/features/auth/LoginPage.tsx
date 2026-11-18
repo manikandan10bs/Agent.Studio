@@ -11,6 +11,7 @@ export const LoginPage: React.FC = () => {
   const [displayName, setDisplayName] = useState('');
   const [loading, setLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
+  const [guestLoading, setGuestLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
   const [resetModalOpen, setResetModalOpen] = useState(false);
@@ -92,10 +93,21 @@ export const LoginPage: React.FC = () => {
     }
   };
 
-  const fillAdminCredentials = () => {
+  const handleVisitWithoutLogin = async () => {
     setMode('signin');
     setEmail('admin@agent.studio');
     setPassword('Admin@Studio2026');
+    setGuestLoading(true);
+    setError(null);
+    setSuccessMsg(null);
+    try {
+      await login('admin@agent.studio', 'Admin@Studio2026');
+      navigate(from, { replace: true });
+    } catch (err: any) {
+      setError(err.message || 'Instant access failed. Please try again.');
+    } finally {
+      setGuestLoading(false);
+    }
   };
 
   return (
@@ -263,7 +275,7 @@ export const LoginPage: React.FC = () => {
 
           <button
             type="submit"
-            disabled={loading || googleLoading}
+            disabled={loading || googleLoading || guestLoading}
             className="w-full mt-2 flex items-center justify-center gap-2 py-2.5 rounded-xl text-xs sm:text-sm font-semibold text-white bg-[#0F172A] hover:bg-[#1E293B] shadow-sm disabled:opacity-50 transition-all cursor-pointer"
           >
             {loading ? (
@@ -277,15 +289,26 @@ export const LoginPage: React.FC = () => {
           </button>
         </form>
 
-        {/* Development Seed Admin Helper */}
+        {/* Instant Portfolio Visitor Access */}
         <div className="mt-6 pt-5 border-t border-slate-100 text-center space-y-3">
           <button
             type="button"
-            onClick={fillAdminCredentials}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-50 border border-blue-200 text-blue-800 hover:bg-blue-100 text-xs font-medium transition-colors cursor-pointer"
+            disabled={loading || googleLoading || guestLoading}
+            onClick={handleVisitWithoutLogin}
+            className="w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-blue-50 border border-blue-200 text-blue-800 hover:bg-blue-100 text-xs sm:text-sm font-semibold transition-colors cursor-pointer disabled:opacity-50"
           >
-            <ShieldCheck className="w-3.5 h-3.5 text-blue-600" />
-            Quick Fill Admin (admin@agent.studio)
+            {guestLoading ? (
+              <>
+                <Loader2 className="w-4 h-4 animate-spin text-blue-600" />
+                <span>Entering Studio...</span>
+              </>
+            ) : (
+              <>
+                <ShieldCheck className="w-4 h-4 text-blue-600" />
+                <span>Visit Without Login</span>
+                <ArrowRight className="w-3.5 h-3.5 text-blue-600" />
+              </>
+            )}
           </button>
 
           <div>
