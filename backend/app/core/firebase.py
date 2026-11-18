@@ -12,6 +12,7 @@ logger = logging.getLogger("agent_studio.firebase")
 
 _firebase_app: Optional[firebase_admin.App] = None
 _firestore_client: Optional[firestore.Client] = None
+_firestore_attempted: bool = False
 _jwk_client: Optional[PyJWKClient] = None
 
 def get_jwk_client(refresh: bool = False) -> PyJWKClient:
@@ -153,10 +154,13 @@ def get_firestore_client() -> Optional[firestore.Client]:
     """
     Returns an initialized Google Cloud Firestore client.
     """
-    global _firestore_client
+    global _firestore_client, _firestore_attempted
     if _firestore_client is not None:
         return _firestore_client
+    if _firestore_attempted:
+        return None
 
+    _firestore_attempted = True
     from app.core.config import settings
 
     project_id = (

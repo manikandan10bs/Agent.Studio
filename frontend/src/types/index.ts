@@ -96,6 +96,7 @@ export interface ToolExecutionInfo {
   tool_id: string;
   tool_name: string;
   parameters?: Record<string, any>;
+  args?: Record<string, any>;
   success: boolean;
   execution_time_ms: number;
   output_preview?: string;

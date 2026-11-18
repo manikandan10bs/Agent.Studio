@@ -177,11 +177,11 @@ async def test_tool_execution(
 
 @router.get("/download/{filename}")
 def download_tool_output(
-    filename: str,
-    current_user: User = Depends(get_current_user)
+    filename: str
 ):
     """
     Download a generated file (chart PNG, cleaned Excel, CSV).
+    Publicly accessible for chatbot rendered images and outputs within OUTPUT_DIR.
     """
     if ".." in filename or "/" in filename or "\\" in filename:
         raise HTTPException(status_code=400, detail="Invalid file path. Path traversal is not permitted.")

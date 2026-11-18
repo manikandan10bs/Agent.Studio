@@ -173,7 +173,8 @@ def init_db(db: Session) -> None:
             enabled_tools=json.dumps([
                 "pdf_extractor", "docx_reader", "excel_processor", "csv_processor",
                 "json_parser", "data_cleaner", "duplicate_finder", "calculator",
-                "datetime_tool", "chart_generator", "url_validator", "text_summarizer"
+                "datetime_tool", "chart_generator", "url_validator", "text_summarizer",
+                "web_search", "web_fetch"
             ]),
             tools_config=json.dumps({}),
             status="tested",

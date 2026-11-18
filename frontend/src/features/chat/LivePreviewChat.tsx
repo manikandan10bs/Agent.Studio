@@ -19,6 +19,7 @@ import {
   Bot,
   Wrench,
   Download,
+  BarChart2,
   History,
   Plus,
   Trash2,
@@ -567,6 +568,42 @@ export const LivePreviewChat: React.FC<LivePreviewChatProps> = ({
                           </div>
                         ))}
                       </div>
+                    </div>
+                  )}
+
+                  {/* Inline Generated Chart Preview */}
+                  {msg.tools && msg.tools.some((t) => (t.tool_id === 'chart_generator' || t.download_url?.endsWith('.png')) && t.download_url) && (
+                    <div className="mt-3 space-y-2">
+                      {msg.tools
+                        .filter((t) => (t.tool_id === 'chart_generator' || t.download_url?.endsWith('.png')) && t.download_url)
+                        .map((chartTool, cIdx) => (
+                          <div key={cIdx} className="rounded-xl border border-indigo-100 bg-white shadow-xs overflow-hidden">
+                            <div className="px-3 py-2 bg-slate-50 border-b border-slate-100 flex items-center justify-between">
+                              <div className="flex items-center gap-1.5 text-xs font-semibold text-slate-800">
+                                <BarChart2 className="w-3.5 h-3.5 text-indigo-600" />
+                                <span>{chartTool.args?.title || 'Interactive Chart'}</span>
+                              </div>
+                              <a
+                                href={chartTool.download_url!}
+                                download
+                                target="_blank"
+                                rel="noreferrer"
+                                className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold text-indigo-600 bg-indigo-50 hover:bg-indigo-100 transition-colors"
+                              >
+                                <Download className="w-3 h-3" />
+                                <span>Save PNG</span>
+                              </a>
+                            </div>
+                            <div className="p-2 bg-slate-50/40 flex items-center justify-center">
+                              <img
+                                src={chartTool.download_url!}
+                                alt="Generated Visualization"
+                                className="max-h-72 w-full object-contain rounded-lg shadow-2xs hover:opacity-95 transition-opacity cursor-pointer"
+                                onClick={() => window.open(chartTool.download_url!, '_blank')}
+                              />
+                            </div>
+                          </div>
+                        ))}
                     </div>
                   )}
 

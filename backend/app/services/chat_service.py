@@ -139,6 +139,17 @@ async def handle_agent_chat(
                 if not response or not getattr(response, "tool_calls", None):
                     break
 
+                # 1. Append the model's turn with raw_parts to preserve thoughtSignature and functionCall IDs
+                model_turn_parts = response.raw_parts if (response and response.raw_parts) else []
+                if not model_turn_parts:
+                    model_turn_parts = [{"functionCall": c} for c in (response.tool_calls or [])]
+                raw_contents.append({
+                    "role": "model",
+                    "parts": model_turn_parts
+                })
+
+                # 2. Execute each tool and accumulate function responses
+                function_responses = []
                 for call in (response.tool_calls or []):
                     call_name = call.get("name")
                     call_args = call.get("args") or {}
@@ -186,20 +197,26 @@ async def handle_agent_chat(
                         "download_url": tool_dl
                     })
 
-                    # Append function call and function response to conversation
-                    raw_contents.append({
-                        "role": "model",
-                        "parts": [{"functionCall": {"name": call_name, "args": call_args}}]
+                    function_responses.append({
+                        "functionResponse": {
+                            "name": call_name,
+                            "response": {"name": call_name, "content": tool_res_content}
+                        }
                     })
-                    raw_contents.append({
-                        "role": "user",
-                        "parts": [{
-                            "functionResponse": {
-                                "name": call_name,
-                                "response": {"name": call_name, "content": tool_res_content}
-                            }
-                        }]
-                    })
+
+                # 3. Append the user's functionResponse turn
+                raw_contents.append({
+                    "role": "user",
+                    "parts": function_responses
+                })
+
+            if executed_tools and (not response or not response.content):
+                response = await adapter.generate(
+                    messages=llm_messages,
+                    system_prompt=system_prompt,
+                    model=model_identifier,
+                    raw_contents=raw_contents
+                )
         else:
             response = await adapter.generate(
                 messages=llm_messages,
@@ -403,6 +420,17 @@ async def stream_agent_chat_generator(
                 if not response or not getattr(response, "tool_calls", None):
                     break
 
+                # 1. Append the model's turn with raw_parts to preserve thoughtSignature and functionCall IDs
+                model_turn_parts = response.raw_parts if (response and response.raw_parts) else []
+                if not model_turn_parts:
+                    model_turn_parts = [{"functionCall": c} for c in (response.tool_calls or [])]
+                raw_contents.append({
+                    "role": "model",
+                    "parts": model_turn_parts
+                })
+
+                # 2. Execute each tool and accumulate function responses
+                function_responses = []
                 for call in (response.tool_calls or []):
                     call_name = call.get("name")
                     call_args = call.get("args") or {}
@@ -450,19 +478,26 @@ async def stream_agent_chat_generator(
                         "download_url": tool_dl
                     })
 
-                    raw_contents.append({
-                        "role": "model",
-                        "parts": [{"functionCall": {"name": call_name, "args": call_args}}]
+                    function_responses.append({
+                        "functionResponse": {
+                            "name": call_name,
+                            "response": {"name": call_name, "content": tool_res_content}
+                        }
                     })
-                    raw_contents.append({
-                        "role": "user",
-                        "parts": [{
-                            "functionResponse": {
-                                "name": call_name,
-                                "response": {"name": call_name, "content": tool_res_content}
-                            }
-                        }]
-                    })
+
+                # 3. Append the user's functionResponse turn
+                raw_contents.append({
+                    "role": "user",
+                    "parts": function_responses
+                })
+
+            if executed_tools and (not response or not response.content):
+                response = await adapter.generate(
+                    messages=llm_messages,
+                    system_prompt=system_prompt,
+                    model=model_identifier,
+                    raw_contents=raw_contents
+                )
 
             if executed_tools:
                 yield f"data: {json.dumps({'tools': executed_tools, 'type': 'tools'})}\n\n"

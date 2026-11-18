@@ -32,13 +32,30 @@ def extract_text_from_file(file_path: str, file_type: str) -> List[ExtractedSect
         if full_text.strip():
             sections.append(ExtractedSection(text=full_text, page_number=1))
 
+    elif normalized_type in ("xlsx", "xls"):
+        import pandas as pd
+        excel_file = pd.ExcelFile(file_path)
+        for idx, sheet_name in enumerate(excel_file.sheet_names):
+            df = pd.read_excel(excel_file, sheet_name=sheet_name)
+            sheet_lines = [f"=== Excel Sheet: {sheet_name} ==="]
+            sheet_lines.append(f"Columns: {', '.join(str(c) for c in df.columns)}")
+            sheet_lines.append(f"Total Records: {len(df)}\n")
+            
+            # Format rows as readable structured text
+            if not df.empty:
+                sheet_lines.append(df.to_string(index=False))
+            
+            sheet_text = "\n".join(sheet_lines).strip()
+            if sheet_text:
+                sections.append(ExtractedSection(text=sheet_text, page_number=idx + 1))
+
     elif normalized_type in ("txt", "md", "csv", "json"):
         with open(file_path, "r", encoding="utf-8", errors="ignore") as f:
             content = f.read().strip()
             if content:
                 sections.append(ExtractedSection(text=content, page_number=1))
     else:
-        raise ValueError(f"Unsupported document format: {file_type}. Supported: pdf, docx, txt")
+        raise ValueError(f"Unsupported document format: {file_type}. Supported: pdf, docx, xlsx, xls, csv, txt, md, json")
 
     if not sections:
         raise ValueError("Document appears to be empty or contains no extractable text.")

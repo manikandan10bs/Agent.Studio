@@ -79,7 +79,32 @@ class WebSearchTool(BaseTool):
         except Exception as e:
             logger.warning(f"DDGS search failed: {e}. Attempting fallback...")
 
-        # 2. Fallback to DuckDuckGo Instant API if DDGS returned nothing
+        # 2. Fallback to DuckDuckGo HTML search if DDGS returned nothing
+        if not results:
+            try:
+                html_headers = {
+                    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+                }
+                async with httpx.AsyncClient(timeout=10.0, follow_redirects=True) as client:
+                    resp = await client.post("https://html.duckduckgo.com/html/", data={"q": query}, headers=html_headers)
+                    if resp.status_code == 200:
+                        soup = BeautifulSoup(resp.text, "html.parser")
+                        for body in soup.select(".result__body")[:max_results]:
+                            title_elem = body.select_one(".result__title a")
+                            snippet_elem = body.select_one(".result__snippet")
+                            if title_elem:
+                                title = title_elem.get_text(strip=True)
+                                href = title_elem.get("href", "")
+                                snippet = snippet_elem.get_text(strip=True) if snippet_elem else ""
+                                results.append({
+                                    "title": title,
+                                    "url": href,
+                                    "snippet": snippet
+                                })
+            except Exception as e:
+                logger.warning(f"DDG HTML search failed: {e}")
+
+        # 3. Fallback to DuckDuckGo Instant API if still nothing
         if not results:
             try:
                 async with httpx.AsyncClient(timeout=10.0, follow_redirects=True) as client:
@@ -192,6 +217,9 @@ class WebFetchTool(BaseTool):
 
         max_chars = min(max(int(params.get("max_characters", 4000) or 4000), 100), 15000)
 
+        MAX_HOPS = 5
+        MAX_RESPONSE_BYTES = 2 * 1024 * 1024  # 2MB response size limit
+
         try:
             headers = {
                 "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
@@ -199,16 +227,50 @@ class WebFetchTool(BaseTool):
                 "Accept-Language": "en-US,en;q=0.5",
             }
 
-            async with httpx.AsyncClient(timeout=12.0, follow_redirects=True, verify=False) as client:
-                resp = await client.get(url, headers=headers)
-                if resp.status_code >= 400:
-                    return ToolExecutionResult(
-                        success=False,
-                        tool_id=self.id,
-                        error=f"Web server returned HTTP {resp.status_code}: {resp.reason_phrase}"
-                    )
+            current_url = url
+            resp = None
+            async with httpx.AsyncClient(timeout=12.0, follow_redirects=False, verify=False) as client:
+                for _ in range(MAX_HOPS):
+                    resp = await client.get(current_url, headers=headers)
+                    if resp.is_redirect:
+                        next_url = resp.headers.get("Location")
+                        if not next_url:
+                            break
+                        from urllib.parse import urljoin
+                        next_url = urljoin(current_url, next_url)
+                        is_safe, msg, _ = is_ssrf_safe_url(next_url)
+                        if not is_safe:
+                            return ToolExecutionResult(
+                                success=False,
+                                tool_id=self.id,
+                                error=f"Security check failed on redirect: {msg}"
+                            )
+                        current_url = next_url
+                        continue
+                    break
 
-                html_content = resp.text
+            if resp is None:
+                return ToolExecutionResult(
+                    success=False,
+                    tool_id=self.id,
+                    error="Failed to obtain response from destination."
+                )
+
+            if resp.status_code >= 400:
+                return ToolExecutionResult(
+                    success=False,
+                    tool_id=self.id,
+                    error=f"Web server returned HTTP {resp.status_code}: {resp.reason_phrase}"
+                )
+
+            if len(resp.content) > MAX_RESPONSE_BYTES:
+                return ToolExecutionResult(
+                    success=False,
+                    tool_id=self.id,
+                    error="Webpage content exceeds maximum allowed download size of 2MB."
+                )
+
+            html_content = resp.text
 
             # Parse HTML and extract clean text
             soup = BeautifulSoup(html_content, "html.parser")

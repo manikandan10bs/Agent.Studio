@@ -87,6 +87,7 @@ export const AgentForm: React.FC<AgentFormProps> = ({
   const [providers, setProviders] = useState<Provider[]>([]);
   const [documents, setDocuments] = useState<Document[]>([]);
   const [isUploading, setIsUploading] = useState(false);
+  const [isDragOver, setIsDragOver] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [newStarter, setNewStarter] = useState('');
   const [showPromptBuilder, setShowPromptBuilder] = useState(false);
@@ -176,22 +177,72 @@ export const AgentForm: React.FC<AgentFormProps> = ({
     handleFieldChange('conversation_starters', starters);
   };
 
-  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = e.target.files;
-    if (!files || files.length === 0 || !agent.id) return;
+  const processUploadFiles = async (files: FileList | File[]) => {
+    if (!files || files.length === 0) return;
     setIsUploading(true);
     setUploadError(null);
 
     try {
+      let targetAgentId = agent.id;
+      // If agent has not been saved yet, auto-create it as draft first so upload succeeds
+      if (!targetAgentId || targetAgentId === 0) {
+        setIsSaving(true);
+        const autoName = agent.name?.trim() || `Agent ${new Date().toLocaleDateString('en-GB')}`;
+        const defaultInstructions = agent.system_instructions?.trim() || 'You are an accurate AI assistant built on Agent.Studio.';
+        const defaultStarters = (agent.conversation_starters && agent.conversation_starters.length > 0)
+          ? agent.conversation_starters
+          : ['What can you assist me with today?'];
+
+        const created = await api.createAgent({
+          name: autoName,
+          description: agent.description?.trim() || '',
+          base_model_id: agent.base_model_id || (models[0]?.id),
+          system_instructions: defaultInstructions,
+          conversation_starters: defaultStarters,
+          capability_rag: true,
+          capability_memory: agent.capability_memory ?? true,
+          capability_streaming: agent.capability_streaming ?? true,
+          enabled_tools: agent.enabled_tools || [],
+          tools_config: agent.tools_config || {},
+        });
+        targetAgentId = created.id;
+        onAgentChange(created);
+        setIsDraftSaved(true);
+        setIsSaving(false);
+      }
+
       for (let i = 0; i < files.length; i++) {
-        const newDoc = await api.uploadAgentDocument(agent.id, files[i]);
+        const newDoc = await api.uploadAgentDocument(targetAgentId, files[i]);
         setDocuments((prev) => [newDoc, ...prev.filter((d) => d.id !== newDoc.id)]);
+      }
+
+      if (!agent.capability_rag) {
+        handleFieldChange('capability_rag', true);
       }
     } catch (err: any) {
       setUploadError(err.message || 'Failed to upload document');
     } finally {
       setIsUploading(false);
+      setIsSaving(false);
+    }
+  };
+
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (files && files.length > 0) {
+      await processUploadFiles(files);
       e.target.value = '';
+    }
+  };
+
+  const handleDropFiles = async (e: React.DragEvent<HTMLLabelElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragOver(false);
+    if (isUploading) return;
+    const files = e.dataTransfer.files;
+    if (files && files.length > 0) {
+      await processUploadFiles(files);
     }
   };
 
@@ -1109,13 +1160,22 @@ export const AgentForm: React.FC<AgentFormProps> = ({
                 </div>
 
                 {/* Upload Dropzone */}
-                <label className="flex flex-col items-center justify-center p-6 border-2 border-dashed border-slate-200 hover:border-indigo-400 rounded-2xl bg-slate-50/60 hover:bg-indigo-50/20 cursor-pointer transition-all group">
+                <label
+                  onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); setIsDragOver(true); }}
+                  onDragLeave={(e) => { e.preventDefault(); e.stopPropagation(); setIsDragOver(false); }}
+                  onDrop={handleDropFiles}
+                  className={`flex flex-col items-center justify-center p-6 border-2 border-dashed rounded-2xl cursor-pointer transition-all group ${
+                    isDragOver
+                      ? 'border-indigo-500 bg-indigo-50/50 scale-[1.01]'
+                      : 'border-slate-200 hover:border-indigo-400 bg-slate-50/60 hover:bg-indigo-50/20'
+                  }`}
+                >
                   <input
                     type="file"
                     multiple
-                    accept=".pdf,.txt,.docx,.md"
+                    accept=".pdf,.txt,.docx,.md,.xlsx,.xls,.csv,.json"
                     onChange={handleFileUpload}
-                    disabled={isUploading || !agent.id}
+                    disabled={isUploading}
                     className="hidden"
                   />
                   <div className="p-3 rounded-2xl bg-indigo-100/80 text-indigo-600 group-hover:scale-105 transition-transform shadow-xs">
@@ -1128,11 +1188,14 @@ export const AgentForm: React.FC<AgentFormProps> = ({
                   <span className="text-xs font-bold text-slate-900 mt-3">
                     {isUploading ? 'Generating semantic vector embeddings...' : 'Upload Knowledge Documents'}
                   </span>
-                  <span className="text-[11px] text-slate-500 mt-0.5">
-                    {!agent.id
-                      ? 'Please save agent as draft first before uploading files'
-                      : 'Supports PDF, Word (.docx), Markdown (.md), and Text files up to 25MB'}
+                  <span className="text-[11px] text-slate-500 mt-0.5 text-center">
+                    Supports PDF, Word (.docx), Excel (.xlsx, .xls), CSV, JSON, and Text files up to 25MB
                   </span>
+                  {!agent.id && (
+                    <span className="text-[10px] text-indigo-600 font-medium mt-1">
+                      (Draft agent will be automatically created upon file upload)
+                    </span>
+                  )}
                 </label>
 
                 {uploadError && (

@@ -15,7 +15,7 @@ from app.services.storage import storage_service
 
 router = APIRouter()
 
-ALLOWED_EXTENSIONS = {"pdf", "txt", "docx", "md"}
+ALLOWED_EXTENSIONS = {"pdf", "txt", "docx", "md", "xlsx", "xls", "csv", "json"}
 MAX_FILE_SIZE_BYTES = 25 * 1024 * 1024  # 25 MB
 
 @router.get("/knowledge-bases", response_model=List[KnowledgeBaseOut])
@@ -107,7 +107,7 @@ async def upload_agent_document(
     if ext not in ALLOWED_EXTENSIONS:
         raise HTTPException(
             status_code=400,
-            detail=f"Unsupported file type .{ext}. Supported formats: PDF, TXT, DOCX"
+            detail=f"Unsupported file type .{ext}. Supported formats: PDF, DOCX, XLSX, XLS, CSV, TXT, MD, JSON"
         )
 
     # Validate file size

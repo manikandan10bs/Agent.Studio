@@ -1,7 +1,7 @@
 import os
 import logging
 from contextlib import asynccontextmanager
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
@@ -53,11 +53,11 @@ if getattr(settings, "CORS_ORIGINS", None) and settings.CORS_ORIGINS.strip():
         if origin_clean and origin_clean not in cors_origins:
             cors_origins.append(origin_clean)
 
-# CORS configuration supporting localhost, custom domains, Firebase Hosting, Cloud Run, and Vercel
+# CORS configuration supporting localhost, custom domains, Render, Firebase Hosting, Cloud Run, and Vercel
 app.add_middleware(
     CORSMiddleware,
     allow_origins=cors_origins,
-    allow_origin_regex=r"https://.*(\.web\.app|\.firebaseapp\.com|\.run\.app|\.vercel\.app)",
+    allow_origin_regex=r"https://.*(\.onrender\.com|\.web\.app|\.firebaseapp\.com|\.run\.app|\.vercel\.app)",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -97,8 +97,8 @@ if frontend_dist:
     @app.head("/{full_path:path}")
     async def serve_spa(full_path: str):
         # Do not intercept /api routes or FastAPI documentation
-        if full_path.startswith("api") or full_path in ["docs", "redoc", "openapi.json"]:
-            return None
+        if full_path.startswith("api/") or full_path == "api" or full_path in ["docs", "redoc", "openapi.json"]:
+            raise HTTPException(status_code=404, detail="Endpoint not found")
         file_path = os.path.join(frontend_dist, full_path)
         if os.path.isfile(file_path):
             return FileResponse(file_path)
